@@ -1,3 +1,4 @@
+import Database from 'better-sqlite3';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { BaseScanner } from './base-scanner.js';
@@ -80,9 +81,64 @@ export class CodexScanner extends BaseScanner {
       });
 
       await fs.writeFile(indexPath, filtered.join('\n') + (filtered.length > 0 ? '\n' : ''), 'utf-8');
+
+      // Clean up SQLite databases so the VS Code plugin no longer sees the session
+      await this.cleanSessionData(session.id);
+
       return true;
     } catch {
       return false;
+    }
+  }
+
+  private async cleanSessionData(threadId: string): Promise<void> {
+    const stateDbPath = path.join(this.codexDir, 'state_5.sqlite');
+    const logsDbPath = path.join(this.codexDir, 'logs_2.sqlite');
+
+    // Clean state_5.sqlite — the authoritative thread store
+    if (await this.fileExists(stateDbPath)) {
+      try {
+        const db = new Database(stateDbPath);
+        // CASCADE handles thread_goals, thread_dynamic_tools, stage1_outputs
+        db.prepare('DELETE FROM threads WHERE id = ?').run(threadId);
+        // No FK constraint, must manually clean
+        db.prepare(
+          'DELETE FROM thread_spawn_edges WHERE parent_thread_id = ? OR child_thread_id = ?',
+        ).run(threadId, threadId);
+        // Disassociate job items from deleted thread (keep the items)
+        db.prepare(
+          'UPDATE agent_job_items SET assigned_thread_id = NULL WHERE assigned_thread_id = ?',
+        ).run(threadId);
+        db.close();
+      } catch {
+        // Best-effort
+      }
+    }
+
+    // Clean logs_2.sqlite — conversation log entries
+    if (await this.fileExists(logsDbPath)) {
+      try {
+        const db = new Database(logsDbPath);
+        db.prepare('DELETE FROM logs WHERE thread_id = ?').run(threadId);
+        db.close();
+      } catch {
+        // Best-effort
+      }
+    }
+
+    // Clean sessions directory — rollout files with thread ID in filename
+    const sessionsDir = path.join(this.codexDir, 'sessions');
+    if (await this.dirExists(sessionsDir)) {
+      try {
+        const files = await this.findFilesRecursive(sessionsDir, ['.jsonl']);
+        for (const file of files) {
+          if (path.basename(file).includes(threadId)) {
+            await fs.unlink(file);
+          }
+        }
+      } catch {
+        // Best-effort
+      }
     }
   }
 
