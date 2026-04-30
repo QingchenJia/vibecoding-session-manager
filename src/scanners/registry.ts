@@ -3,6 +3,7 @@ import { ClaudeCodeScanner } from './claude-code-scanner.js';
 import { CursorScanner } from './cursor-scanner.js';
 import { CopilotScanner } from './copilot-scanner.js';
 import { WindsurfScanner } from './windsurf-scanner.js';
+import { CodexScanner } from './codex-scanner.js';
 
 export class ScannerRegistry {
   private scanners: Map<AgentType, IScanner> = new Map();
@@ -12,6 +13,7 @@ export class ScannerRegistry {
     this.register(new CursorScanner());
     this.register(new CopilotScanner());
     this.register(new WindsurfScanner());
+    this.register(new CodexScanner());
   }
 
   register(scanner: IScanner): void {

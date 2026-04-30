@@ -7,6 +7,7 @@ const AGENT_COLORS: Record<AgentType, ChalkInstance> = {
   cursor: chalk.hex('#6C5CE7'),
   copilot: chalk.hex('#00B8D4'),
   windsurf: chalk.hex('#00B894'),
+  codex: chalk.hex('#10A37F'),
 };
 
 const AGENT_NAMES: Record<AgentType, string> = {
@@ -14,6 +15,7 @@ const AGENT_NAMES: Record<AgentType, string> = {
   cursor: 'Cursor',
   copilot: 'GitHub Copilot',
   windsurf: 'Windsurf',
+  codex: 'Codex (OpenAI)',
 };
 
 export function getAgentColor(agent: AgentType): ChalkInstance {

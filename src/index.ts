@@ -12,6 +12,7 @@ const VALID_AGENTS: AgentType[] = [
   'cursor',
   'copilot',
   'windsurf',
+  'codex',
 ];
 
 function parseAgent(value: string): AgentType {

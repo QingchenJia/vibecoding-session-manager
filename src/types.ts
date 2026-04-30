@@ -1,4 +1,4 @@
-export type AgentType = 'claude-code' | 'cursor' | 'copilot' | 'windsurf';
+export type AgentType = 'claude-code' | 'cursor' | 'copilot' | 'windsurf' | 'codex';
 
 export interface Session {
   id: string;
