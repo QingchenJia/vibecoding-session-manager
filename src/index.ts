@@ -2,18 +2,14 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { ScannerRegistry } from './scanners/registry.js';
-import { displaySessionGroups, displayJson, displayStats } from './ui/display.js';
+import { displaySessionGroups, displayJson, displayStats, getAgentDisplayName } from './ui/display.js';
 import { interactiveDelete } from './ui/interactive.js';
 import { formatBytes } from './utils/formatters.js';
-import type { AgentType, SessionGroup } from './types.js';
+import { SkillRegistry } from './skills/skill-registry.js';
+import { displaySkillOverview, displaySkillJson } from './skills/display.js';
+import type { AgentType, SessionGroup, SkillInfo } from './types.js';
 
-const VALID_AGENTS: AgentType[] = [
-  'claude-code',
-  'cursor',
-  'copilot',
-  'windsurf',
-  'codex',
-];
+const VALID_AGENTS: AgentType[] = ['cc', 'copilot', 'codex'];
 
 function parseAgent(value: string): AgentType {
   if (!VALID_AGENTS.includes(value as AgentType)) {
@@ -29,13 +25,14 @@ const program = new Command();
 program
   .name('vibe')
   .description('Manage AI coding agent sessions')
-  .version('0.1.0');
+  .version('0.1.0')
+  .addHelpText('after', `\nSupported agents: ${VALID_AGENTS.map((a) => `${a} (${getAgentDisplayName(a)})`).join(', ')}\n`);
 
 // ─── list ──────────────────────────────────────────────────────────
 program
   .command('list')
   .description('List all discovered sessions grouped by agent')
-  .option('-a, --agent <agent>', 'Filter by agent type')
+  .option('-a, --agent <agent>', `Filter by agent (${VALID_AGENTS.join(', ')})`)
   .option('--json', 'Output as JSON')
   .action(async (options) => {
     const registry = new ScannerRegistry();
@@ -65,8 +62,8 @@ program
 program
   .command('delete')
   .description('Interactively select and delete sessions')
-  .option('-a, --agent <agent>', 'Filter by agent type')
-  .option('--all', 'Delete ALL sessions (use with --agent for a specific agent)')
+  .option('-a, --agent <agent>', `Filter by agent (${VALID_AGENTS.join(', ')})`)
+  .option('--all', `Delete ALL sessions (use with --agent for a specific agent: ${VALID_AGENTS.join(', ')})`)
   .action(async (options) => {
     const registry = new ScannerRegistry();
 
@@ -129,7 +126,7 @@ program
   .command('delete-id')
   .description('Delete a session by its ID')
   .argument('<id>', 'Session ID to delete')
-  .requiredOption('-a, --agent <agent>', 'Agent type owning the session')
+  .requiredOption('-a, --agent <agent>', `Agent owning the session (${VALID_AGENTS.join(', ')})`)
   .action(async (id: string, options) => {
     const registry = new ScannerRegistry();
 
@@ -168,7 +165,7 @@ program
     'Delete sessions older than this many days',
     parseInt,
   )
-  .option('-a, --agent <agent>', 'Only prune from this agent')
+  .option('-a, --agent <agent>', `Only prune from this agent (${VALID_AGENTS.join(', ')})`)
   .option('--dry-run', 'Show what would be deleted without deleting')
   .action(async (options) => {
     const registry = new ScannerRegistry();
@@ -258,6 +255,75 @@ program
     try {
       const groups = await registry.discoverAll();
       displayStats(groups);
+    } catch (err) {
+      console.error(chalk.red(`Error: ${(err as Error).message}`));
+      process.exit(1);
+    }
+  });
+
+// ─── skills ────────────────────────────────────────────────────────
+const skillsCmd = program
+  .command('skills')
+  .description('List all personal skills and their agent registrations')
+  .option('--json', 'Output as JSON')
+  .action(async (options) => {
+    const registry = new SkillRegistry();
+    try {
+      const skills = await registry.discoverAll();
+      const agents = registry.getKnownAgents();
+      if (options.json) {
+        displaySkillJson(skills, agents);
+      } else {
+        displaySkillOverview(skills, agents);
+      }
+    } catch (err) {
+      console.error(chalk.red(`Error: ${(err as Error).message}`));
+      process.exit(1);
+    }
+  });
+
+skillsCmd
+  .command('register')
+  .description('Register a skill to a specific agent')
+  .argument('<name>', 'Skill name to register')
+  .requiredOption('-t, --to <agent>', `Target agent (${VALID_AGENTS.join(', ')})`)
+  .option('-f, --from <agent>', `Source agent (${VALID_AGENTS.join(', ')})`)
+  .action(async (name: string, options) => {
+    const toAgent = parseAgent(options.to);
+    const fromAgent = options.from ? parseAgent(options.from) : undefined;
+
+    const registry = new SkillRegistry();
+    try {
+      const result = await registry.register(name, toAgent, fromAgent);
+      if (result.success) {
+        console.log(chalk.green(`\n  ${result.message}`));
+      } else {
+        console.error(chalk.red(`\n  ${result.message}`));
+        process.exit(1);
+      }
+    } catch (err) {
+      console.error(chalk.red(`Error: ${(err as Error).message}`));
+      process.exit(1);
+    }
+  });
+
+skillsCmd
+  .command('deregister')
+  .description('Remove a skill from a specific agent')
+  .argument('<name>', 'Skill name to deregister')
+  .requiredOption('-f, --from <agent>', `Agent to remove from (${VALID_AGENTS.join(', ')})`)
+  .action(async (name: string, options) => {
+    const fromAgent = parseAgent(options.from);
+
+    const registry = new SkillRegistry();
+    try {
+      const result = await registry.deregister(name, fromAgent);
+      if (result.success) {
+        console.log(chalk.green(`\n  ${result.message}`));
+      } else {
+        console.error(chalk.red(`\n  ${result.message}`));
+        process.exit(1);
+      }
     } catch (err) {
       console.error(chalk.red(`Error: ${(err as Error).message}`));
       process.exit(1);

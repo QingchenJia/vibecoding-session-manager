@@ -1,4 +1,4 @@
-export type AgentType = 'claude-code' | 'cursor' | 'copilot' | 'windsurf' | 'codex';
+export type AgentType = 'cc' | 'copilot' | 'codex';
 
 export interface Session {
   id: string;
@@ -19,6 +19,12 @@ export interface IScanner {
   getDisplayName(): string;
   discover(): Promise<Session[]>;
   delete(session: Session): Promise<boolean>;
+}
+
+export interface SkillInfo {
+  name: string;
+  description: string;
+  registeredIn: AgentType[];
 }
 
 export interface PlatformInfo {

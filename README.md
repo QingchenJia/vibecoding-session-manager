@@ -1,10 +1,10 @@
 # VibeCoding Session Manager
 
-A terminal tool to manage AI coding agent sessions — list, inspect, and delete conversations from **Claude Code**, **Codex (OpenAI)**, **Cursor**, **GitHub Copilot**, and **Windsurf**.
+A terminal tool to manage AI coding agent sessions and skills — list, delete sessions and manage cross-agent skills for **Claude Code**, **Codex (OpenAI)**, and **GitHub Copilot**.
 
 ### Motivation
 
-AI coding agents accumulate session files on disk over time. These files — conversation transcripts, context data, and logs — can grow to hundreds of megabytes and are never cleaned up automatically. This tool gives you a unified interface to browse, measure, and delete them across all agents.
+AI coding agents accumulate session files and skills on disk over time. Sessions — conversation transcripts, context data, and logs — can grow to hundreds of megabytes and are never cleaned up automatically. Skills are stored in agent-specific directories and must be manually copied between agents. This tool gives you a unified interface to manage both.
 
 ### Installation
 
@@ -23,20 +23,32 @@ After installation, the `vibe` command works from any terminal, any directory.
 
 **Requirements:** Node.js >= 18
 
-### Commands
+### Agent Names
+
+In all commands, agents are referenced by short names:
+
+| Name | Agent |
+|------|-------|
+| `cc` | Claude Code |
+| `codex` | Codex (OpenAI) |
+| `copilot` | GitHub Copilot |
+
+Run `vibe --help` to see this list at any time.
+
+### Session Commands
 
 #### `vibe list` — List all sessions grouped by agent
 
 ```bash
-vibe list                        # show all agents
-vibe list --agent claude-code    # filter by specific agent
-vibe list --agent codex          # only Codex sessions
-vibe list --json                 # machine-readable JSON output
+vibe list                    # show all agents
+vibe list --agent cc         # filter by specific agent
+vibe list --agent codex      # only Codex sessions
+vibe list --json             # machine-readable JSON output
 ```
 
 Output shows session ID (first 8 chars), project name, last activity time, and file size per session, grouped and color-coded by agent.
 
-#### `vibe delete` — Interactive session deletion (core feature)
+#### `vibe delete` — Interactive session deletion
 
 Two-stage interactive flow:
 1. **Choose an agent** from the list (or "All agents")
@@ -48,16 +60,13 @@ Two-stage interactive flow:
 vibe delete                        # interactive multi-select across all agents
 vibe delete --agent copilot        # filter to Copilot first, then interactive
 vibe delete --all --agent codex    # delete ALL Codex sessions at once (with confirmation)
-vibe delete --all --agent copilot  # delete ALL Copilot sessions at once
 vibe delete --all                  # delete ALL sessions from ALL agents (double-confirms)
 ```
 
 #### `vibe delete-id` — Delete a specific session by its ID
 
-Useful for scripting or when you know the exact session ID from `vibe list --json`:
-
 ```bash
-vibe delete-id b68c4922-9707-4fb6-bd60-5e4a56087c58 -a claude-code
+vibe delete-id <session-id> -a cc
 ```
 
 #### `vibe prune` — Delete sessions older than N days
@@ -66,7 +75,6 @@ vibe delete-id b68c4922-9707-4fb6-bd60-5e4a56087c58 -a claude-code
 vibe prune -d 30                   # delete sessions untouched for 30+ days
 vibe prune -d 30 --agent copilot   # only prune Copilot sessions
 vibe prune -d 30 --dry-run         # preview: show what would be deleted, no action
-vibe prune -d 7 --agent codex      # delete Codex sessions older than 7 days
 ```
 
 #### `vibe stats` — Disk usage summary
@@ -77,27 +85,53 @@ vibe stats
 
 Shows per-agent breakdown: session count, total size, oldest session, newest session, and grand total.
 
+### Skill Commands
+
+Skills are personal extensions installed in agent-specific directories. Different agents store skills in different locations, and a skill installed for one agent is not automatically available to others. `vibe skills` provides a unified view and cross-agent registration.
+
+#### `vibe skills` — Overview of all personal skills
+
+```bash
+vibe skills           # table showing each skill with per-agent registration status
+vibe skills --json    # machine-readable JSON output
+```
+
+Agent built-in skills (e.g., Codex system skills) are excluded. Only user-installed personal skills are shown.
+
+#### `vibe skills register` — Register a skill to another agent
+
+Copies a skill from any agent that has it to a target agent's skill directory.
+
+```bash
+vibe skills register karpathy-guidelines --to copilot           # auto-discovers source
+vibe skills register karpathy-guidelines --to copilot --from cc # explicit source
+```
+
+#### `vibe skills deregister` — Remove a skill from an agent
+
+Deletes the skill directory from the specified agent.
+
+```bash
+vibe skills deregister karpathy-guidelines --from cc
+```
+
 ### Supported Agents
 
-| Agent | Storage Location | Scan Method |
-|-------|-----------------|-------------|
-| **Claude Code** | `~/.claude/projects/<encoded>/*.jsonl` | Direct file scan |
-| **Codex (OpenAI)** | `~/.codex/session_index.jsonl` + SQLite DBs + sessions/ | Index parsing + SQLite + file scan |
-| **Cursor** | `<appData>/Cursor/User/workspaceStorage/<hash>/chatSessions/` | Workspace storage scan |
-| **GitHub Copilot** | `<appData>/Code/User/workspaceStorage/<hash>/` + `GitHub.copilot-chat/transcripts/` | Workspace + Copilot transcript scan |
-| **Windsurf** | `<appData>/Windsurf/User/workspaceStorage/<hash>/chatSessions/` | Workspace storage scan |
+| Agent | Sessions | Skills |
+|-------|----------|--------|
+| **Claude Code** | `~/.claude/projects/<encoded>/*.jsonl` | `~/.claude/skills/` |
+| **Codex (OpenAI)** | `~/.codex/session_index.jsonl` + SQLite DBs | `~/.codex/skills/` (system skills in `.system/`) |
+| **GitHub Copilot** | `<appData>/Code/User/workspaceStorage/<hash>/` + transcripts | `~/.copilot/skills/` |
 
 Scanners gracefully return no results when an agent is not installed on the machine — no errors, just zero sessions.
 
 #### Agent-Specific Notes
 
-**Claude Code** — Each project has encoded directory names (e.g., `D--Code-my-project`) under `~/.claude/projects/`. Within each project directory, individual `.jsonl` files represent conversation sessions. Deleting a session removes the `.jsonl` file and its associated subdirectory.
+**Claude Code** — Sessions: each project has encoded directory names (e.g., `D--Code-my-project`) under `~/.claude/projects/`. Deleting a session removes the `.jsonl` file and its associated subdirectory. Skills: `~/.claude/skills/<name>/SKILL.md`.
 
-**Codex (OpenAI)** — Sessions are indexed in `~/.codex/session_index.jsonl` (JSONL format with `id`, `thread_name`, `updated_at`). Actual conversation data lives in shared SQLite databases (`logs_2.sqlite`, `state_5.sqlite`) and per-session rollout files under `~/.codex/sessions/`. The scanner estimates per-session size by dividing total database size by session count. Deleting a session removes its index entry, its SQLite thread and log records, and its rollout file.
+**Codex (OpenAI)** — Sessions indexed in `~/.codex/session_index.jsonl`. Actual data in shared SQLite databases (`logs_2.sqlite`, `state_5.sqlite`) and per-session rollout files under `~/.codex/sessions/`. Deleting removes index entry, SQLite records, and rollout files. Skills: `~/.codex/skills/<name>/SKILL.md`, with built-in skills under `.system/` subdirectory.
 
-**Cursor / Windsurf** — Both are VS Code forks and share the same `workspaceStorage` structure. Each workspace folder is identified by a hash and contains a `workspace.json` that maps to the project path. Sessions live in `chatSessions/` as `.jsonl` or `.json` files. Deleting removes only the session file, preserving workspace configuration.
-
-**GitHub Copilot** — Extends the VS Code workspace storage pattern with additional `GitHub.copilot-chat/transcripts/` directories. The scanner deduplicates entries that appear in both locations.
+**GitHub Copilot** — Sessions stored in VS Code workspace storage with additional `GitHub.copilot-chat/transcripts/` directories. Skills: `~/.copilot/skills/<name>/SKILL.md`. Note: Copilot may also discover skills from other agents' directories at runtime.
 
 ### Project Structure
 
@@ -112,10 +146,11 @@ src/
 │   ├── base-scanner.ts         # Abstract scanner with shared I/O utilities
 │   ├── claude-code-scanner.ts  # Claude Code session discovery and deletion
 │   ├── codex-scanner.ts        # Codex (OpenAI) session discovery and deletion
-│   ├── cursor-scanner.ts       # Cursor session discovery and deletion
 │   ├── copilot-scanner.ts      # GitHub Copilot session discovery and deletion
-│   ├── windsurf-scanner.ts     # Windsurf session discovery and deletion
 │   └── registry.ts             # Scanner registry — orchestrates all agent scanners
+├── skills/
+│   ├── skill-registry.ts       # Skill discovery, registration, and deregistration
+│   └── display.ts              # Skill overview table and JSON output
 └── ui/
     ├── display.ts              # Terminal output: tables, colors, stats formatting
     └── interactive.ts          # Interactive deletion UI: checkboxes, confirmations
@@ -123,18 +158,20 @@ src/
 
 ### Architecture
 
-Each agent has its own **scanner** implementing the `IScanner` interface:
+**Sessions** — Each agent has a **scanner** implementing the `IScanner` interface:
 
 ```typescript
 interface IScanner {
   readonly agent: AgentType;
-  getDisplayName(): string;        // human-readable name
-  discover(): Promise<Session[]>;  // find all sessions for this agent
-  delete(session: Session): Promise<boolean>;  // remove a specific session
+  getDisplayName(): string;
+  discover(): Promise<Session[]>;
+  delete(session: Session): Promise<boolean>;
 }
 ```
 
-The **ScannerRegistry** aggregates all scanners. CLI commands call the registry, which delegates to the appropriate scanner(s). Adding support for a new agent requires only a new scanner class and a one-line registration.
+The **ScannerRegistry** aggregates all scanners. CLI commands call the registry, which delegates to the appropriate scanner(s).
+
+**Skills** — The **SkillRegistry** scans each agent's skill directory, groups skills by name across agents, and provides register/deregister operations via directory copy/delete. Built-in skill detection is agent-specific (e.g., Codex uses a `.system/` subdirectory marker).
 
 ### Development
 

@@ -5,7 +5,7 @@ import type { Session, AgentType } from '../types.js';
 import { decodeProjectName } from '../utils/formatters.js';
 
 export class ClaudeCodeScanner extends BaseScanner {
-  readonly agent: AgentType = 'claude-code';
+  readonly agent: AgentType = 'cc';
 
   getDisplayName(): string {
     return 'Claude Code';
@@ -44,7 +44,7 @@ export class ClaudeCodeScanner extends BaseScanner {
         sessions.push({
           id: sessionId,
           name: decodeProjectName(projectName),
-          agent: 'claude-code',
+          agent: 'cc',
           path: sessionPath,
           lastModified: stats.mtime,
           size: stats.size,

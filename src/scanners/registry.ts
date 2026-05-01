@@ -1,8 +1,6 @@
 import type { IScanner, Session, SessionGroup, AgentType } from '../types.js';
 import { ClaudeCodeScanner } from './claude-code-scanner.js';
-import { CursorScanner } from './cursor-scanner.js';
 import { CopilotScanner } from './copilot-scanner.js';
-import { WindsurfScanner } from './windsurf-scanner.js';
 import { CodexScanner } from './codex-scanner.js';
 
 export class ScannerRegistry {
@@ -10,9 +8,7 @@ export class ScannerRegistry {
 
   constructor() {
     this.register(new ClaudeCodeScanner());
-    this.register(new CursorScanner());
     this.register(new CopilotScanner());
-    this.register(new WindsurfScanner());
     this.register(new CodexScanner());
   }
 

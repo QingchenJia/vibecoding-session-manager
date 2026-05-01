@@ -1,16 +1,16 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { CursorScanner } from './cursor-scanner.js';
+import { BaseScanner } from './base-scanner.js';
 import type { Session, AgentType } from '../types.js';
 
-export class CopilotScanner extends CursorScanner {
+export class CopilotScanner extends BaseScanner {
   readonly agent: AgentType = 'copilot';
 
   getDisplayName(): string {
     return 'GitHub Copilot';
   }
 
-  protected override get workspaceStorageDir(): string | null {
+  private get workspaceStorageDir(): string | null {
     if (this.platform.isWindows) {
       return this.platform.appData
         ? path.join(this.platform.appData, 'Code', 'User', 'workspaceStorage')
@@ -32,7 +32,7 @@ export class CopilotScanner extends CursorScanner {
     );
   }
 
-  override async discover(): Promise<Session[]> {
+  async discover(): Promise<Session[]> {
     const wsDir = this.workspaceStorageDir;
     if (!wsDir || !(await this.dirExists(wsDir))) return [];
 
@@ -86,6 +86,69 @@ export class CopilotScanner extends CursorScanner {
           id,
           name: workspaceName,
           agent: 'copilot',
+          path: filePath,
+          lastModified: stats.mtime,
+          size: stats.size,
+        });
+      }
+    }
+
+    sessions.sort((a, b) => b.lastModified - a.lastModified);
+    return sessions;
+  }
+
+  async delete(session: Session): Promise<boolean> {
+    try {
+      await fs.unlink(session.path);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private async scanWorkspaceStorage(
+    wsDir: string,
+    agent: AgentType,
+  ): Promise<Session[]> {
+    const sessions: Session[] = [];
+    let hashes: string[];
+    try {
+      hashes = await fs.readdir(wsDir);
+    } catch {
+      return [];
+    }
+
+    for (const hash of hashes) {
+      const hashPath = path.join(wsDir, hash);
+      if (!(await this.dirExists(hashPath))) continue;
+
+      const workspaceJson = await this.readJsonFile<{ folder?: string }>(
+        path.join(hashPath, 'workspace.json'),
+      );
+      const workspaceName = workspaceJson?.folder
+        ? decodeURIComponent(
+            workspaceJson.folder
+              .replace(/^file:\/\/\//, '')
+              .replace(/^file:\/\//, ''),
+          )
+        : `Untitled (${hash.slice(0, 8)})`;
+
+      const chatSessionsDir = path.join(hashPath, 'chatSessions');
+      const sessionFiles = await this.findFilesRecursive(
+        chatSessionsDir,
+        ['.jsonl', '.json'],
+        3,
+      );
+
+      for (const filePath of sessionFiles) {
+        const stats = await this.getFileStats(filePath);
+        if (stats.size === 0) continue;
+
+        const filename = path.basename(filePath, path.extname(filePath));
+        sessions.push({
+          id: `${hash}-${filename}`,
+          name: workspaceName,
+          agent,
           path: filePath,
           lastModified: stats.mtime,
           size: stats.size,
