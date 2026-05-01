@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { BaseScanner } from './base-scanner.js';
-import type { Session, AgentType } from '../types.js';
+import type { Session, AgentType, SessionDetail } from '../types.js';
 import { decodeProjectName } from '../utils/formatters.js';
 
 export class ClaudeCodeScanner extends BaseScanner {
@@ -54,6 +54,53 @@ export class ClaudeCodeScanner extends BaseScanner {
 
     sessions.sort((a, b) => b.lastModified - a.lastModified);
     return sessions;
+  }
+
+  async inspect(session: Session): Promise<SessionDetail> {
+    const detail: SessionDetail = { session };
+    try {
+      const content = await fs.readFile(session.path, 'utf-8');
+      const lines = content.split('\n').filter((l) => l.trim());
+      detail.rawFiles = [session.path];
+
+      const userMessages: string[] = [];
+      const assistantMessages: string[] = [];
+      const preview: string[] = [];
+
+      for (const line of lines) {
+        let entry: Record<string, unknown>;
+        try { entry = JSON.parse(line); } catch { continue; }
+        if (entry.type === 'user' && entry.message) {
+          const msg = entry.message as Record<string, unknown>;
+          if (msg.role === 'user' && typeof msg.content === 'string') {
+            const text = msg.content;
+            userMessages.push(text);
+            if (preview.length < 10) preview.push(`[user] ${text.slice(0, 120)}`);
+          }
+        } else if (entry.type === 'assistant' && entry.message) {
+          const msg = entry.message as Record<string, unknown>;
+          if (msg.role === 'assistant' && Array.isArray(msg.content)) {
+            const texts: string[] = [];
+            for (const block of msg.content as Array<Record<string, unknown>>) {
+              if (block.type === 'text' && typeof block.text === 'string') {
+                texts.push(block.text);
+              }
+            }
+            if (texts.length > 0) {
+              const combined = texts.join(' ');
+              assistantMessages.push(combined);
+              if (preview.length < 10) preview.push(`[assistant] ${combined.slice(0, 120)}`);
+            }
+          }
+        }
+      }
+
+      detail.messageCount = userMessages.length + assistantMessages.length;
+      detail.firstUserMessage = userMessages[0];
+      detail.lastUserMessage = userMessages[userMessages.length - 1];
+      detail.preview = preview;
+    } catch { /* best effort */ }
+    return detail;
   }
 
   async delete(session: Session): Promise<boolean> {

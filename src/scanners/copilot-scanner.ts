@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { BaseScanner } from './base-scanner.js';
-import type { Session, AgentType } from '../types.js';
+import type { Session, AgentType, SessionDetail } from '../types.js';
 
 export class CopilotScanner extends BaseScanner {
   readonly agent: AgentType = 'copilot';
@@ -95,6 +95,41 @@ export class CopilotScanner extends BaseScanner {
 
     sessions.sort((a, b) => b.lastModified - a.lastModified);
     return sessions;
+  }
+
+  async inspect(session: Session): Promise<SessionDetail> {
+    const detail: SessionDetail = { session };
+    detail.rawFiles = [session.path];
+
+    try {
+      const content = await fs.readFile(session.path, 'utf-8');
+      const lines = content.split('\n').filter((l) => l.trim());
+      const preview: string[] = [];
+      let userCount = 0;
+      let assistantCount = 0;
+
+      for (const line of lines) {
+        try {
+          const e = JSON.parse(line);
+          const role = e.role as string;
+          const text = e.content as string;
+          if (role === 'user' && text) {
+            userCount++;
+            if (!detail.firstUserMessage) detail.firstUserMessage = text;
+            detail.lastUserMessage = text;
+            if (preview.length < 10) preview.push(`[user] ${text.slice(0, 120)}`);
+          } else if (role === 'assistant' && text) {
+            assistantCount++;
+            if (preview.length < 10) preview.push(`[assistant] ${text.slice(0, 120)}`);
+          }
+        } catch { continue; }
+      }
+
+      detail.messageCount = userCount + assistantCount;
+      detail.preview = preview;
+    } catch { /* best effort */ }
+
+    return detail;
   }
 
   async delete(session: Session): Promise<boolean> {

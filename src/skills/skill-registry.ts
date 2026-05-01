@@ -210,6 +210,124 @@ export class SkillRegistry {
     }
   }
 
+  async inspect(skillName: string): Promise<{
+    skillName: string;
+    description: string;
+    registeredIn: AgentType[];
+    paths: Record<string, string>;
+    files: Record<string, string[]>;
+  } | null> {
+    const registeredIn: AgentType[] = [];
+    const paths: Record<string, string> = {};
+    const files: Record<string, string[]> = {};
+    let description = '';
+
+    for (const agent of this.agents) {
+      const config = this.configs.get(agent)!;
+      const skillDir = path.join(config.skillsDir, skillName);
+      try {
+        await fs.access(skillDir);
+        registeredIn.push(agent);
+        paths[agent] = skillDir;
+
+        // Read SKILL.md for description
+        const mdPath = path.join(skillDir, 'SKILL.md');
+        try {
+          const content = await fs.readFile(mdPath, 'utf-8');
+          const fm = content.match(/^---\s*\n([\s\S]*?)\n---/);
+          if (fm) {
+            const desc = fm[1].match(/^description:\s*(.+)$/m)?.[1]?.trim();
+            if (desc && !description) description = desc;
+          }
+        } catch { /* skip */ }
+
+        // List files
+        const fileList: string[] = [];
+        await this.listFiles(skillDir, skillDir, fileList);
+        files[agent] = fileList;
+      } catch {
+        // not registered in this agent
+      }
+    }
+
+    if (registeredIn.length === 0) return null;
+    return { skillName, description, registeredIn, paths, files };
+  }
+
+  async diff(
+    skillName: string,
+    agentA: AgentType,
+    agentB: AgentType,
+  ): Promise<{
+    skillName: string;
+    agentA: AgentType;
+    agentB: AgentType;
+    diffLines: string[];
+    onlyInA: string[];
+    onlyInB: string[];
+  }> {
+    const configA = this.configs.get(agentA)!;
+    const configB = this.configs.get(agentB)!;
+    const dirA = path.join(configA.skillsDir, skillName);
+    const dirB = path.join(configB.skillsDir, skillName);
+
+    const diffLines: string[] = [];
+    const onlyInA: string[] = [];
+    const onlyInB: string[] = [];
+
+    // Compare SKILL.md
+    const mdA = await this.readFileSafe(path.join(dirA, 'SKILL.md'));
+    const mdB = await this.readFileSafe(path.join(dirB, 'SKILL.md'));
+
+    if (mdA === null && mdB === null) {
+      diffLines.push('SKILL.md missing in both agents');
+    } else if (mdA === null) {
+      diffLines.push('SKILL.md only exists in ' + agentB);
+    } else if (mdB === null) {
+      diffLines.push('SKILL.md only exists in ' + agentA);
+    } else if (mdA !== mdB) {
+      diffLines.push('SKILL.md differs');
+    }
+
+    // Compare files
+    const filesA = new Set<string>();
+    const filesB = new Set<string>();
+    await this.listFiles(dirA, dirA, []).then((f) => f.forEach((x) => filesA.add(x))).catch(() => {});
+    await this.listFiles(dirB, dirB, []).then((f) => f.forEach((x) => filesB.add(x))).catch(() => {});
+
+    for (const f of filesA) {
+      if (!filesB.has(f)) onlyInA.push(f);
+    }
+    for (const f of filesB) {
+      if (!filesA.has(f)) onlyInB.push(f);
+    }
+
+    if (onlyInA.length === 0 && onlyInB.length === 0) {
+      diffLines.push('All files match');
+    }
+
+    return { skillName, agentA, agentB, diffLines, onlyInA, onlyInB };
+  }
+
+  private async readFileSafe(filePath: string): Promise<string | null> {
+    try { return await fs.readFile(filePath, 'utf-8'); } catch { return null; }
+  }
+
+  private async listFiles(baseDir: string, dir: string, result: string[]): Promise<string[]> {
+    try {
+      const entries = await fs.readdir(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          await this.listFiles(baseDir, fullPath, result);
+        } else {
+          result.push(path.relative(baseDir, fullPath).replace(/\\/g, '/'));
+        }
+      }
+    } catch { /* skip */ }
+    return result;
+  }
+
   private async copyDir(src: string, dest: string): Promise<void> {
     await fs.mkdir(dest, { recursive: true });
     const entries = await fs.readdir(src, { withFileTypes: true });

@@ -14,11 +14,32 @@ export interface SessionGroup {
   sessions: Session[];
 }
 
+export interface SessionDetail {
+  session: Session;
+  messageCount?: number;
+  firstUserMessage?: string;
+  lastUserMessage?: string;
+  preview?: string[];
+  rawFiles?: string[];
+}
+
 export interface IScanner {
   readonly agent: AgentType;
   getDisplayName(): string;
   discover(): Promise<Session[]>;
   delete(session: Session): Promise<boolean>;
+  inspect?(session: Session): Promise<SessionDetail>;
+}
+
+export interface SearchResult {
+  session: Session;
+  matches: SearchMatch[];
+}
+
+export interface SearchMatch {
+  line: number;
+  content: string;
+  snippet: string;
 }
 
 export interface SkillInfo {

@@ -3,10 +3,15 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { ScannerRegistry } from './scanners/registry.js';
 import { displaySessionGroups, displayJson, displayStats, getAgentDisplayName } from './ui/display.js';
+import { displayInspect } from './ui/inspect.js';
 import { interactiveDelete } from './ui/interactive.js';
 import { formatBytes } from './utils/formatters.js';
 import { SkillRegistry } from './skills/skill-registry.js';
-import { displaySkillOverview, displaySkillJson } from './skills/display.js';
+import { displaySkillOverview, displaySkillJson, displaySkillInspect, displaySkillDiff } from './skills/display.js';
+import { Doctor } from './doctor/doctor.js';
+import { displayDoctorResults } from './doctor/display.js';
+import { searchSessions } from './search/search.js';
+import { displaySearchResults } from './search/display.js';
 import type { AgentType, SessionGroup, SkillInfo } from './types.js';
 
 const VALID_AGENTS: AgentType[] = ['cc', 'copilot', 'codex'];
@@ -246,6 +251,31 @@ program
     }
   });
 
+// ─── search ───────────────────────────────────────────────────────
+program
+  .command('search')
+  .description('Search session content across agents')
+  .argument('<query>', 'Text to search for in session messages')
+  .option('-a, --agent <agent>', `Filter by agent (${VALID_AGENTS.join(', ')})`)
+  .option('-s, --since <days>', 'Only search sessions from the last N days', parseInt)
+  .option('-n, --limit <count>', 'Limit results to N sessions', parseInt)
+  .action(async (query: string, options) => {
+    try {
+      if (options.agent) parseAgent(options.agent);
+      const since = options.since ? options.since * 24 * 60 * 60 * 1000 : undefined;
+      const results = await searchSessions({
+        query,
+        agent: options.agent ? parseAgent(options.agent) : undefined,
+        since,
+        limit: options.limit,
+      });
+      displaySearchResults(results, query);
+    } catch (err) {
+      console.error(chalk.red(`Error: ${(err as Error).message}`));
+      process.exit(1);
+    }
+  });
+
 // ─── stats ────────────────────────────────────────────────────────
 program
   .command('stats')
@@ -255,6 +285,53 @@ program
     try {
       const groups = await registry.discoverAll();
       displayStats(groups);
+    } catch (err) {
+      console.error(chalk.red(`Error: ${(err as Error).message}`));
+      process.exit(1);
+    }
+  });
+
+// ─── inspect ──────────────────────────────────────────────────────
+program
+  .command('inspect')
+  .description('Show detailed information about a session')
+  .argument('<id>', 'Session ID to inspect')
+  .requiredOption('-a, --agent <agent>', `Agent owning the session (${VALID_AGENTS.join(', ')})`)
+  .action(async (id: string, options) => {
+    const agent = parseAgent(options.agent);
+    const registry = new ScannerRegistry();
+
+    try {
+      const sessions = await registry.discoverByAgent(agent);
+      const session = sessions.find((s) => s.id === id || s.id.includes(id));
+      if (!session) {
+        console.error(chalk.red(`Session not found: ${id}`));
+        process.exit(1);
+      }
+
+      const scanner = registry.get(agent);
+      if (!scanner || !scanner.inspect) {
+        console.error(chalk.red(`Inspect not supported for ${agent}`));
+        process.exit(1);
+      }
+
+      const detail = await scanner.inspect(session);
+      displayInspect(detail);
+    } catch (err) {
+      console.error(chalk.red(`Error: ${(err as Error).message}`));
+      process.exit(1);
+    }
+  });
+
+// ─── doctor ───────────────────────────────────────────────────────
+program
+  .command('doctor')
+  .description('Check agent installation health and detect issues')
+  .action(async () => {
+    const doctor = new Doctor();
+    try {
+      const results = await doctor.runAll();
+      displayDoctorResults(results);
     } catch (err) {
       console.error(chalk.red(`Error: ${(err as Error).message}`));
       process.exit(1);
@@ -324,6 +401,44 @@ skillsCmd
         console.error(chalk.red(`\n  ${result.message}`));
         process.exit(1);
       }
+    } catch (err) {
+      console.error(chalk.red(`Error: ${(err as Error).message}`));
+      process.exit(1);
+    }
+  });
+
+skillsCmd
+  .command('inspect')
+  .description('Show detailed information about a skill')
+  .argument('<name>', 'Skill name to inspect')
+  .action(async (name: string) => {
+    const registry = new SkillRegistry();
+    try {
+      const result = await registry.inspect(name);
+      if (!result) {
+        console.error(chalk.red(`\n  Skill "${name}" not found in any agent`));
+        process.exit(1);
+      }
+      displaySkillInspect(result);
+    } catch (err) {
+      console.error(chalk.red(`Error: ${(err as Error).message}`));
+      process.exit(1);
+    }
+  });
+
+skillsCmd
+  .command('diff')
+  .description('Compare a skill between two agents')
+  .argument('<name>', 'Skill name to compare')
+  .argument('<agent-a>', `First agent (${VALID_AGENTS.join(', ')})`)
+  .argument('<agent-b>', `Second agent (${VALID_AGENTS.join(', ')})`)
+  .action(async (name: string, a: string, b: string) => {
+    const agentA = parseAgent(a);
+    const agentB = parseAgent(b);
+    const registry = new SkillRegistry();
+    try {
+      const result = await registry.diff(name, agentA, agentB);
+      displaySkillDiff(result);
     } catch (err) {
       console.error(chalk.red(`Error: ${(err as Error).message}`));
       process.exit(1);

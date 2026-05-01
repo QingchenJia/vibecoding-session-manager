@@ -1,7 +1,7 @@
 {
   "name": "vibecoding-session-manager",
   "version": "0.1.0",
-  "description": "Terminal tool to manage AI coding agent sessions — list, inspect, and delete conversations from Claude Code, Cursor, GitHub Copilot, and Windsurf.",
+  "description": "Terminal tool to manage AI coding agent sessions and skills across Claude Code, Codex (OpenAI), and GitHub Copilot.",
   "type": "module",
   "license": "MIT",
   "author": "QingchenJia",
@@ -14,10 +14,10 @@
     "ai",
     "coding-agent",
     "session-manager",
+    "skill-manager",
     "claude-code",
-    "cursor",
+    "codex",
     "copilot",
-    "windsurf",
     "disk-cleanup",
     "terminal"
   ],

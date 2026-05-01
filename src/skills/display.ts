@@ -58,3 +58,89 @@ export function displaySkillOverview(skills: SkillInfo[], agents: AgentType[]): 
 export function displaySkillJson(skills: SkillInfo[], agents: AgentType[]): void {
   console.log(JSON.stringify({ skills, agents }, null, 2));
 }
+
+export function displaySkillInspect(result: {
+  skillName: string;
+  description: string;
+  registeredIn: AgentType[];
+  paths: Record<string, string>;
+  files: Record<string, string[]>;
+}): void {
+  console.log('');
+  console.log(chalk.bold(`  ${result.skillName}`));
+  console.log(chalk.dim(`  ${'─'.repeat(50)}`));
+
+  console.log(chalk.bold('\n  Registered in:'));
+  for (const agent of result.registeredIn) {
+    const color = getAgentColor(agent);
+    const label = getAgentDisplayName(agent);
+    console.log(`  ${color('●')} ${label}: ${chalk.dim(result.paths[agent])}`);
+  }
+
+  if (result.description) {
+    console.log('');
+    console.log(chalk.bold('  Description:'));
+    console.log(chalk.dim(`  ${result.description}`));
+  }
+
+  if (Object.keys(result.files).length > 0) {
+    console.log('');
+    console.log(chalk.bold('  Files:'));
+    for (const agent of result.registeredIn) {
+      const fileList = result.files[agent];
+      if (fileList && fileList.length > 0) {
+        const color = getAgentColor(agent);
+        const label = getAgentDisplayName(agent);
+        console.log(color(`  ${label}:`));
+        for (const f of fileList) {
+          console.log(chalk.dim(`    ${f}`));
+        }
+      }
+    }
+  }
+
+  console.log('');
+}
+
+export function displaySkillDiff(result: {
+  skillName: string;
+  agentA: AgentType;
+  agentB: AgentType;
+  diffLines: string[];
+  onlyInA: string[];
+  onlyInB: string[];
+}): void {
+  console.log('');
+  console.log(
+    chalk.bold(
+      `  ${result.skillName}: ${getAgentDisplayName(result.agentA)} vs ${getAgentDisplayName(result.agentB)}`,
+    ),
+  );
+  console.log(chalk.dim(`  ${'─'.repeat(50)}`));
+
+  for (const line of result.diffLines) {
+    if (line === 'All files match') {
+      console.log(chalk.green(`  ${line}`));
+    } else if (line === 'SKILL.md differs') {
+      console.log(chalk.yellow(`  ${line}`));
+    } else {
+      console.log(chalk.red(`  ${line}`));
+    }
+  }
+
+  if (result.onlyInA.length > 0) {
+    console.log(chalk.yellow(`\n  Only in ${getAgentDisplayName(result.agentA)}:`));
+    for (const f of result.onlyInA) {
+      console.log(chalk.dim(`    ${f}`));
+    }
+  }
+
+  if (result.onlyInB.length > 0) {
+    console.log(chalk.yellow(`\n  Only in ${getAgentDisplayName(result.agentB)}:`));
+    for (const f of result.onlyInB) {
+      console.log(chalk.dim(`    ${f}`));
+    }
+  }
+
+  console.log('');
+}

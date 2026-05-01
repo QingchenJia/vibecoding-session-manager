@@ -85,6 +85,36 @@ vibe stats
 
 Shows per-agent breakdown: session count, total size, oldest session, newest session, and grand total.
 
+#### `vibe inspect` — Show detailed session information
+
+```bash
+vibe inspect <session-id> -a cc       # Claude Code: full JSONL parse with preview
+vibe inspect <session-id> -a codex    # Codex: rollout + SQLite metadata
+vibe inspect <session-id> -a copilot  # Copilot: transcript summary and file paths
+```
+
+Displays project name, session ID, path, last activity, size, first/last user message, message count, preview, and raw file list. Depth varies by agent depending on data format.
+
+#### `vibe search` — Full-text search across session content
+
+```bash
+vibe search "docker compose"              # search all agents
+vibe search "RAG" --agent cc              # only Claude Code
+vibe search "PostgreSQL" --agent codex    # only Codex
+vibe search "API" --since 30              # only last 30 days
+vibe search "error" --limit 5             # limit to 5 sessions
+```
+
+Searches user messages across agent session files with plain text matching (multi-keyword AND). Shows matched session with highlighted snippet. `--agent`, `--since`, `--limit` filters supported.
+
+#### `vibe doctor` — Health check across all agents
+
+```bash
+vibe doctor
+```
+
+Checks each agent's session paths, skill directories, file permissions, and detects anomalies: empty session files, invalid JSONL lines, orphan rollout files with no matching SQLite thread, corrupt indices. Outputs a per-agent status summary with issues flagged.
+
 ### Skill Commands
 
 Skills are personal extensions installed in agent-specific directories. Different agents store skills in different locations, and a skill installed for one agent is not automatically available to others. `vibe skills` provides a unified view and cross-agent registration.
@@ -114,6 +144,22 @@ Deletes the skill directory from the specified agent.
 ```bash
 vibe skills deregister karpathy-guidelines --from cc
 ```
+
+#### `vibe skills inspect` — Show detailed skill information
+
+```bash
+vibe skills inspect karpathy-guidelines
+```
+
+Displays skill name, description, which agents have it registered with full paths, and a file listing per agent.
+
+#### `vibe skills diff` — Compare a skill between two agents
+
+```bash
+vibe skills diff karpathy-guidelines cc codex
+```
+
+Checks whether `SKILL.md` content differs and whether any files exist in only one agent. Reports differences clearly.
 
 ### Supported Agents
 
@@ -149,10 +195,17 @@ src/
 │   ├── copilot-scanner.ts      # GitHub Copilot session discovery and deletion
 │   └── registry.ts             # Scanner registry — orchestrates all agent scanners
 ├── skills/
-│   ├── skill-registry.ts       # Skill discovery, registration, and deregistration
-│   └── display.ts              # Skill overview table and JSON output
+│   ├── skill-registry.ts       # Skill discovery, registration, deregistration, inspect, diff
+│   └── display.ts              # Skill overview table, inspect, diff, JSON output
+├── search/
+│   ├── search.ts               # Full-text search across agent session content
+│   └── display.ts              # Search result display with term highlighting
+├── doctor/
+│   ├── doctor.ts               # Health check: path existence, permissions, orphan detection
+│   └── display.ts              # Health check result display
 └── ui/
     ├── display.ts              # Terminal output: tables, colors, stats formatting
+    ├── inspect.ts              # Session detail inspection display
     └── interactive.ts          # Interactive deletion UI: checkboxes, confirmations
 ```
 
@@ -166,6 +219,7 @@ interface IScanner {
   getDisplayName(): string;
   discover(): Promise<Session[]>;
   delete(session: Session): Promise<boolean>;
+  inspect?(session: Session): Promise<SessionDetail>;
 }
 ```
 

@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { BaseScanner } from './base-scanner.js';
-import type { Session, AgentType } from '../types.js';
+import type { Session, AgentType, SessionDetail } from '../types.js';
 
 interface CodexSessionEntry {
   id: string;
@@ -67,6 +67,59 @@ export class CodexScanner extends BaseScanner {
 
     sessions.sort((a, b) => b.lastModified - a.lastModified);
     return sessions;
+  }
+
+  async inspect(session: Session): Promise<SessionDetail> {
+    const detail: SessionDetail = { session };
+    detail.rawFiles = [this.indexPath];
+
+    // Try to read thread metadata from SQLite
+    const stateDbPath = path.join(this.codexDir, 'state_5.sqlite');
+    if (await this.fileExists(stateDbPath)) {
+      try {
+        const db = new Database(stateDbPath);
+        const row = db.prepare(
+          'SELECT first_user_message, title, rollout_path, tokens_used FROM threads WHERE id = ?',
+        ).get(session.id) as Record<string, unknown> | undefined;
+        db.close();
+
+        if (row) {
+          detail.firstUserMessage = row.first_user_message as string;
+          detail.messageCount = row.tokens_used ? undefined : undefined; // Codex doesn't track message count directly
+          const rp = row.rollout_path as string;
+          if (rp) {
+            const fullRp = path.join(this.codexDir, rp);
+            if (await this.fileExists(fullRp)) {
+              detail.rawFiles!.push(fullRp);
+              // Try reading rollout for more detail
+              try {
+                const rc = await fs.readFile(fullRp, 'utf-8');
+                const lines = rc.split('\n').filter((l) => l.trim());
+                let msgCount = 0;
+                const preview: string[] = [];
+                for (const l of lines) {
+                  try {
+                    const e = JSON.parse(l);
+                    if (e.type === 'response_item' && e.payload?.content) {
+                      for (const c of e.payload.content) {
+                        if (c.text) {
+                          msgCount++;
+                          if (preview.length < 10) preview.push(`[${e.payload.role || '?'}] ${c.text.slice(0, 120)}`);
+                        }
+                      }
+                    }
+                  } catch { continue; }
+                }
+                detail.messageCount = msgCount;
+                detail.preview = preview;
+              } catch { /* skip */ }
+            }
+          }
+        }
+      } catch { /* skip */ }
+    }
+
+    return detail;
   }
 
   async delete(session: Session): Promise<boolean> {
