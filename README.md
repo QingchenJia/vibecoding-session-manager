@@ -23,6 +23,68 @@ After installation, the `vibe` command works from any terminal, any directory.
 
 **Requirements:** Node.js >= 18
 
+### Shell Completion
+
+Tab completion for commands, agents, options, skill names, and session IDs.
+
+Generate the completion script for your shell:
+
+```bash
+vibe completion bash        # Bash
+vibe completion zsh         # Zsh
+vibe completion fish        # Fish
+vibe completion powershell  # PowerShell
+```
+
+Or auto-detect and install in one step:
+
+```bash
+vibe completion install
+```
+
+#### Manual Installation
+
+```bash
+# Bash
+vibe completion bash > ~/.local/share/bash-completion/completions/vibe
+source ~/.local/share/bash-completion/completions/vibe
+
+# Zsh
+vibe completion zsh > ~/.zfunc/_vibe
+# Ensure ~/.zfunc is in your fpath (add to ~/.zshrc):
+#   fpath=(~/.zfunc $fpath)
+
+# Fish
+vibe completion fish > ~/.config/fish/completions/vibe.fish
+
+# PowerShell
+vibe completion powershell >> $PROFILE
+```
+
+Restart your shell or source the file to activate.
+
+#### What Gets Completed
+
+Completion is **prefix-based** — only shows results matching what you've already typed.
+
+| Input | Tab Result |
+|-------|-----------|
+| `vibe l` | `list` |
+| `vibe d` | `delete`, `delete-id`, `doctor` |
+| `vibe list --` | `--agent`, `--json`, `--help` |
+| `vibe list -a c` | `cc`, `copilot`, `codex` |
+| `vibe skills r` | `register` |
+| `vibe inspect bd` | `bd378032-fef2-...` (session ID) |
+| `vibe completion b` | `bash` |
+
+Completed items include:
+
+- **Command names** — top-level and subcommands (e.g., `skills register`)
+- **Agent names** — `cc`, `copilot`, `codex` for `-a`/`-t`/`-f` flags and positional args
+- **Skill names** — dynamically discovered from your skill directories
+- **Session IDs** — prefix-matched from your actual sessions (cached for 30s)
+- **Flags** — command-specific options (`--json`, `--all`, `--dry-run`, etc.)
+
 ### Agent Names
 
 In all commands, agents are referenced by short names:
@@ -185,6 +247,7 @@ Scanners gracefully return no results when an agent is not installed on the mach
 src/
 ├── index.ts                    # CLI entry point (commander)
 ├── types.ts                    # Shared TypeScript interfaces and types
+├── completion.ts               # Shell completion scripts and handler
 ├── utils/
 │   ├── platform.ts             # Cross-platform detection (Windows/macOS/Linux)
 │   └── formatters.ts           # Time formatting, byte formatting, path decoding

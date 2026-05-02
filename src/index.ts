@@ -12,6 +12,9 @@ import { Doctor } from './doctor/doctor.js';
 import { displayDoctorResults } from './doctor/display.js';
 import { searchSessions } from './search/search.js';
 import { displaySearchResults } from './search/display.js';
+import os from 'node:os';
+import path from 'node:path';
+import { generateCompletionScript, handleComplete } from './completion.js';
 import type { AgentType, SessionGroup, SkillInfo } from './types.js';
 
 const VALID_AGENTS: AgentType[] = ['cc', 'copilot', 'codex'];
@@ -23,6 +26,75 @@ function parseAgent(value: string): AgentType {
     );
   }
   return value as AgentType;
+}
+
+function detectShell(): string {
+  const shell = process.env.SHELL || '';
+  const parent = process.env.ZSH_VERSION ? 'zsh'
+    : process.env.BASH_VERSION ? 'bash'
+    : process.env.FISH_VERSION ? 'fish'
+    : '';
+  const fromEnv = parent || shell;
+  if (fromEnv.includes('zsh')) return 'zsh';
+  if (fromEnv.includes('bash')) return 'bash';
+  if (fromEnv.includes('fish')) return 'fish';
+  if (process.platform === 'win32') return 'powershell';
+  return 'bash';
+}
+
+async function getCompletionInstallPath(shell: string): Promise<string | null> {
+  const home = os.homedir();
+  switch (shell) {
+    case 'bash':
+      return path.join(home, '.local', 'share', 'bash-completion', 'completions', 'vibe');
+    case 'zsh':
+      return path.join(home, '.zfunc', '_vibe');
+    case 'fish':
+      return path.join(home, '.config', 'fish', 'completions', 'vibe.fish');
+    case 'powershell':
+      // Query PowerShell directly — $PROFILE path varies by version:
+      //   PS 5.1 → Documents\WindowsPowerShell\...
+      //   PS 7+  → Documents\PowerShell\...
+      try {
+        const { execSync } = await import('node:child_process');
+        const profile = execSync('powershell -NoProfile -Command "$PROFILE"', {
+          encoding: 'utf-8',
+          timeout: 5000,
+        }).trim();
+        if (profile) return profile;
+      } catch { /* fall through */ }
+      return path.join(home, 'Documents', 'PowerShell', 'Microsoft.PowerShell_profile.ps1');
+    default:
+      return null;
+  }
+}
+
+async function installCompletion(shell: string, installPath: string, script: string): Promise<void> {
+  const fs = await import('node:fs/promises');
+  const pathMod = await import('node:path');
+
+  await fs.mkdir(pathMod.dirname(installPath), { recursive: true });
+
+  if (shell === 'powershell') {
+    // Append to profile, don't overwrite existing content
+    let existing = '';
+    try { existing = await fs.readFile(installPath, 'utf-8'); } catch { /* file doesn't exist yet */ }
+    if (existing.includes('Register-ArgumentCompleter -CommandName vibe')) {
+      console.log(chalk.yellow(`vibe completion already installed in ${installPath}`));
+      return;
+    }
+    const marker = '\n# vibe completion\n';
+    await fs.writeFile(installPath, existing + marker + script + '\n', 'utf-8');
+  } else {
+    await fs.writeFile(installPath, script, 'utf-8');
+  }
+
+  console.log(chalk.green(`Completion script installed to ${installPath}`));
+  if (shell === 'powershell') {
+    console.log(chalk.dim('\nRestart PowerShell to activate completions.'));
+  } else {
+    console.log(chalk.dim(`\nRestart your shell or run: source ${installPath}`));
+  }
 }
 
 const program = new Command();
@@ -445,4 +517,84 @@ skillsCmd
     }
   });
 
+// ─── completion ──────────────────────────────────────────────────────
+const completionCmd = program
+  .command('completion')
+  .description('Generate shell completion scripts')
+  .argument('[shell]', 'Shell name (bash, zsh, fish, powershell)')
+  .action(async (shell: string | undefined) => {
+    // No shell argument: install mode
+    if (!shell) {
+      const detected = detectShell();
+      const script = generateCompletionScript(detected);
+      const installPath = await getCompletionInstallPath(detected);
+
+      if (!installPath) {
+        // Can't auto-install, output to stdout with instructions
+        console.log(script);
+        console.error(chalk.yellow(`\nCould not determine install path for ${detected}.`));
+        console.error(chalk.dim('Copy the output above to your shell config, or use:'));
+        console.error(chalk.dim(`  vibe completion ${detected} > <path>`));
+        return;
+      }
+
+      try {
+        await installCompletion(detected, installPath, script);
+      } catch (err) {
+        console.error(chalk.red(`Failed to write: ${(err as Error).message}`));
+        console.log(script);
+      }
+      return;
+    }
+
+    // Shell argument: generate and print
+    try {
+      console.log(generateCompletionScript(shell));
+    } catch (err) {
+      console.error(chalk.red(`Error: ${(err as Error).message}`));
+      process.exit(1);
+    }
+  });
+
+completionCmd
+  .command('install')
+  .description('Detect shell and install completion script')
+  .action(async () => {
+    const detected = detectShell();
+    const script = generateCompletionScript(detected);
+    const installPath = await getCompletionInstallPath(detected);
+
+    if (!installPath) {
+      console.log(script);
+      console.error(chalk.yellow(`\nCould not determine install path for ${detected}.`));
+      console.error(chalk.dim('Copy the output above to your shell config, or use:'));
+      console.error(chalk.dim(`  vibe completion ${detected} > <path>`));
+      return;
+    }
+
+    try {
+      await installCompletion(detected, installPath, script);
+    } catch (err) {
+      console.error(chalk.red(`Failed to write: ${(err as Error).message}`));
+      console.log(script);
+    }
+  });
+
+// ─── __complete (hidden) ───────────────────────────────────────────
+program
+  .command('__complete', { hidden: true })
+  .option('--line <line>', 'Current command line')
+  .option('--point <point>', 'Cursor position', parseInt)
+  .action(async (options) => {
+    try {
+      const results = await handleComplete(options.line || '', options.point || 0);
+      for (const r of results) {
+        console.log(r);
+      }
+    } catch {
+      // Silent — don't break shell on errors
+    }
+  });
+
 program.parse();
+
