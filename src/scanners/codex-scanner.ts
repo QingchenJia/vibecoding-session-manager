@@ -26,42 +26,46 @@ export class CodexScanner extends BaseScanner {
   }
 
   async discover(): Promise<Session[]> {
-    const indexPath = this.indexPath;
-    if (!(await this.fileExists(indexPath))) return [];
-
-    let content: string;
-    try {
-      content = await fs.readFile(indexPath, 'utf-8');
-    } catch {
-      return [];
-    }
-
     const sessions: Session[] = [];
-    const lines = content.split('\n').filter((line) => line.trim());
+    const seen = new Set<string>();
 
-    for (const line of lines) {
-      const entry = this.parseEntry(line);
-      if (!entry) continue;
+    // Source 1: session_index.jsonl (VS Code plugin sessions)
+    const indexPath = this.indexPath;
+    if (await this.fileExists(indexPath)) {
+      try {
+        const content = await fs.readFile(indexPath, 'utf-8');
+        const lines = content.split('\n').filter((line) => line.trim());
 
-      const lastModified = new Date(entry.updated_at).getTime();
-      if (isNaN(lastModified)) continue;
+        for (const line of lines) {
+          const entry = this.parseEntry(line);
+          if (!entry) continue;
 
-      sessions.push({
-        id: entry.id,
-        name: entry.thread_name || `Session ${entry.id.slice(0, 8)}`,
-        agent: 'codex',
-        path: indexPath, // index file as reference
-        lastModified,
-        size: 0, // conversation data is in shared SQLite
-      });
+          const lastModified = new Date(entry.updated_at).getTime();
+          if (isNaN(lastModified)) continue;
+
+          seen.add(entry.id);
+          sessions.push({
+            id: entry.id,
+            name: entry.thread_name || `Session ${entry.id.slice(0, 8)}`,
+            agent: 'codex',
+            path: indexPath,
+            lastModified,
+            size: 0,
+          });
+        }
+      } catch { /* index read failed, continue with filesystem scan */ }
     }
 
-    // Estimate per-session size from SQLite databases
+    // Source 2: ~/.codex/sessions/ (CLI rollout files)
+    const fsSessions = await this.discoverFromSessionsDir(seen);
+    sessions.push(...fsSessions);
+
+    // Estimate per-session size from SQLite for index-based sessions
     const dbSize = await this.getTotalDbSize();
     if (dbSize > 0 && sessions.length > 0) {
       const perSession = Math.round(dbSize / sessions.length);
       for (const s of sessions) {
-        s.size = perSession;
+        if (s.size === 0) s.size = perSession;
       }
     }
 
@@ -69,11 +73,68 @@ export class CodexScanner extends BaseScanner {
     return sessions;
   }
 
+  private async discoverFromSessionsDir(seen: Set<string>): Promise<Session[]> {
+    const sessionsDir = path.join(this.codexDir, 'sessions');
+    if (!(await this.dirExists(sessionsDir))) return [];
+
+    const files = await this.findFilesRecursive(sessionsDir, ['.jsonl']);
+    const sessions: Session[] = [];
+
+    for (const filePath of files) {
+      const id = this.extractSessionId(path.basename(filePath));
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+
+      const stats = await this.getFileStats(filePath);
+      const meta = await this.readSessionMeta(filePath);
+
+      sessions.push({
+        id,
+        name: meta.name || `Session ${id.slice(0, 8)}`,
+        agent: 'codex',
+        path: filePath,
+        lastModified: stats.mtime || Date.now(),
+        size: stats.size,
+      });
+    }
+
+    return sessions;
+  }
+
+  private extractSessionId(filename: string): string | null {
+    const match = filename.match(
+      /^rollout-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-(.+)\.jsonl$/,
+    );
+    return match ? match[1] : null;
+  }
+
+  private async readSessionMeta(
+    filePath: string,
+  ): Promise<{ name: string }> {
+    try {
+      const content = await fs.readFile(filePath, 'utf-8');
+      const firstLine = content.split('\n').find((l) => l.trim());
+      if (!firstLine) return { name: '' };
+
+      const entry = JSON.parse(firstLine);
+      if (entry.type === 'session_meta' && entry.payload?.cwd) {
+        return { name: path.basename(entry.payload.cwd) };
+      }
+      return { name: '' };
+    } catch {
+      return { name: '' };
+    }
+  }
+
   async inspect(session: Session): Promise<SessionDetail> {
     const detail: SessionDetail = { session };
-    detail.rawFiles = [this.indexPath];
 
-    // Try to read thread metadata from SQLite
+    // Determine if this is a filesystem-discovered session (path points to rollout)
+    const isRolloutPath = session.path.endsWith('.jsonl') &&
+      path.dirname(session.path) !== this.codexDir;
+    detail.rawFiles = isRolloutPath ? [session.path] : [this.indexPath];
+
+    // Try SQLite for additional metadata
     const stateDbPath = path.join(this.codexDir, 'state_5.sqlite');
     if (await this.fileExists(stateDbPath)) {
       try {
@@ -85,63 +146,80 @@ export class CodexScanner extends BaseScanner {
 
         if (row) {
           detail.firstUserMessage = row.first_user_message as string;
-          detail.messageCount = row.tokens_used ? undefined : undefined; // Codex doesn't track message count directly
           const rp = row.rollout_path as string;
           if (rp) {
             const fullRp = path.join(this.codexDir, rp);
-            if (await this.fileExists(fullRp)) {
+            if (!isRolloutPath && await this.fileExists(fullRp)) {
               detail.rawFiles!.push(fullRp);
-              // Try reading rollout for more detail
-              try {
-                const rc = await fs.readFile(fullRp, 'utf-8');
-                const lines = rc.split('\n').filter((l) => l.trim());
-                let msgCount = 0;
-                const preview: string[] = [];
-                for (const l of lines) {
-                  try {
-                    const e = JSON.parse(l);
-                    if (e.type === 'response_item' && e.payload?.content) {
-                      for (const c of e.payload.content) {
-                        if (c.text) {
-                          msgCount++;
-                          if (preview.length < 10) preview.push(`[${e.payload.role || '?'}] ${c.text.slice(0, 120)}`);
-                        }
-                      }
-                    }
-                  } catch { continue; }
-                }
-                detail.messageCount = msgCount;
-                detail.preview = preview;
-              } catch { /* skip */ }
             }
+            await this.populateRolloutDetail(fullRp, detail);
           }
         }
       } catch { /* skip */ }
     }
 
+    // For filesystem-discovered sessions without SQLite data, read rollout directly
+    if (!detail.firstUserMessage && isRolloutPath) {
+      await this.populateRolloutDetail(session.path, detail);
+    }
+
     return detail;
   }
 
-  async delete(session: Session): Promise<boolean> {
-    const indexPath = this.indexPath;
+  private async populateRolloutDetail(
+    rolloutPath: string,
+    detail: SessionDetail,
+  ): Promise<void> {
     try {
-      const content = await fs.readFile(indexPath, 'utf-8');
-      const lines = content.split('\n').filter((line) => line.trim());
+      const rc = await fs.readFile(rolloutPath, 'utf-8');
+      const lines = rc.split('\n').filter((l) => l.trim());
+      let msgCount = 0;
+      const preview: string[] = [];
 
-      const filtered = lines.filter((line) => {
-        const entry = this.parseEntry(line);
-        return !entry || entry.id !== session.id;
-      });
+      for (const l of lines) {
+        try {
+          const e = JSON.parse(l);
+          if (e.type === 'session_meta' && !detail.firstUserMessage) {
+            detail.firstUserMessage = e.payload?.cwd || undefined;
+          }
+          if (e.type === 'response_item' && e.payload?.content) {
+            for (const c of e.payload.content) {
+              if (c.text) {
+                msgCount++;
+                if (preview.length < 10) preview.push(`[${e.payload.role || '?'}] ${c.text.slice(0, 120)}`);
+              }
+            }
+          }
+        } catch { continue; }
+      }
 
-      await fs.writeFile(indexPath, filtered.join('\n') + (filtered.length > 0 ? '\n' : ''), 'utf-8');
+      detail.messageCount = msgCount;
+      detail.preview = preview;
+    } catch { /* skip */ }
+  }
 
-      // Clean up SQLite databases so the VS Code plugin no longer sees the session
-      await this.cleanSessionData(session.id);
-
-      return true;
-    } catch {
-      return false;
+  async delete(session: Session): Promise<boolean> {
+    // Remove from session_index.jsonl if it exists
+    const indexPath = this.indexPath;
+    if (await this.fileExists(indexPath)) {
+      try {
+        const content = await fs.readFile(indexPath, 'utf-8');
+        const lines = content.split('\n').filter((line) => line.trim());
+        const filtered = lines.filter((line) => {
+          const entry = this.parseEntry(line);
+          return !entry || entry.id !== session.id;
+        });
+        await fs.writeFile(
+          indexPath,
+          filtered.join('\n') + (filtered.length > 0 ? '\n' : ''),
+          'utf-8',
+        );
+      } catch { /* best-effort on index, still try to clean data */ }
     }
+
+    // Clean up session data (SQLite + sessions directory files)
+    await this.cleanSessionData(session.id);
+    return true;
   }
 
   private async cleanSessionData(threadId: string): Promise<void> {
