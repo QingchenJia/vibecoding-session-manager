@@ -155,7 +155,12 @@ vibe inspect <session-id> -a codex    # Codex: rollout + SQLite metadata
 vibe inspect <session-id> -a copilot  # Copilot: transcript summary and file paths
 ```
 
-Displays project name, session ID, path, last activity, size, first/last user message, message count, preview, and raw file list. Depth varies by agent depending on data format.
+Displays project name, session ID, path, last activity, size, first/last user message, message count, token usage (input/output/cached/total), preview, and raw file list.
+
+**Token usage** is displayed when the agent provides usage data:
+- **Claude Code** — accumulated from `message.usage` across all assistant entries in the JSONL session file. Shows input tokens, cache read tokens (if any), output tokens, and total (sum of all three).
+- **Codex** — read from the `tokens_used` column in `state_5.sqlite`. Supports JSON and plain-number formats.
+- **Copilot** — not displayed (token usage data is not available in Copilot session transcripts).
 
 #### `vibe search` — Full-text search across session content
 

@@ -14,6 +14,13 @@ export interface SessionGroup {
   sessions: Session[];
 }
 
+export interface TokenUsage {
+  input: number;
+  output: number;
+  total: number;
+  cacheRead?: number;
+}
+
 export interface SessionDetail {
   session: Session;
   messageCount?: number;
@@ -21,6 +28,7 @@ export interface SessionDetail {
   lastUserMessage?: string;
   preview?: string[];
   rawFiles?: string[];
+  tokenUsage?: TokenUsage;
 }
 
 export interface IScanner {

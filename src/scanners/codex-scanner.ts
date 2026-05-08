@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { BaseScanner } from './base-scanner.js';
-import type { Session, AgentType, SessionDetail } from '../types.js';
+import type { Session, AgentType, SessionDetail, TokenUsage } from '../types.js';
 
 interface CodexSessionEntry {
   id: string;
@@ -146,6 +146,7 @@ export class CodexScanner extends BaseScanner {
 
         if (row) {
           detail.firstUserMessage = row.first_user_message as string;
+          detail.tokenUsage = this.parseTokenUsage(row.tokens_used);
           const rp = row.rollout_path as string;
           if (rp) {
             const fullRp = path.join(this.codexDir, rp);
@@ -271,6 +272,34 @@ export class CodexScanner extends BaseScanner {
         // Best-effort
       }
     }
+  }
+
+  private parseTokenUsage(raw: unknown): TokenUsage | undefined {
+    if (raw === null || raw === undefined) return undefined;
+    if (typeof raw === 'number' && raw > 0) {
+      return { input: raw, output: 0, total: raw };
+    }
+    if (typeof raw === 'string') {
+      try {
+        const parsed = JSON.parse(raw);
+        if (typeof parsed === 'number' && parsed > 0) {
+          return { input: parsed, output: 0, total: parsed };
+        }
+        if (typeof parsed === 'object' && parsed !== null) {
+          const input = (parsed.input_tokens || parsed.input || 0) as number;
+          const output = (parsed.output_tokens || parsed.output || 0) as number;
+          const cacheRead = (parsed.cache_read_input_tokens || parsed.cacheRead || undefined) as number | undefined;
+          if (input > 0 || output > 0) {
+            return { input, output, total: input + output + (cacheRead || 0), cacheRead };
+          }
+        }
+      } catch { /* not JSON */ }
+      const num = Number(raw);
+      if (!isNaN(num) && num > 0) {
+        return { input: num, output: 0, total: num };
+      }
+    }
+    return undefined;
   }
 
   private parseEntry(line: string): CodexSessionEntry | null {

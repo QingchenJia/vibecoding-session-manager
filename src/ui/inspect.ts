@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import type { SessionDetail } from '../types.js';
 import { getAgentColor, getAgentDisplayName } from './display.js';
-import { formatRelativeTime, formatBytes, truncate } from '../utils/formatters.js';
+import { formatRelativeTime, formatBytes, formatNumber, truncate } from '../utils/formatters.js';
 
 export function displayInspect(detail: SessionDetail): void {
   const s = detail.session;
@@ -33,6 +33,16 @@ export function displayInspect(detail: SessionDetail): void {
     console.log('');
     console.log(chalk.bold('  Message count:'));
     console.log(`  ${chalk.dim('Total:'.padEnd(12))} ${detail.messageCount}`);
+  }
+
+  if (detail.tokenUsage) {
+    const tu = detail.tokenUsage;
+    const cacheStr = tu.cacheRead ? ` (${formatNumber(tu.cacheRead)} cached)` : '';
+    console.log('');
+    console.log(chalk.bold('  Token Usage:'));
+    console.log(`  ${chalk.dim('Input:'.padEnd(16))} ${formatNumber(tu.input)}${chalk.dim(cacheStr)}`);
+    console.log(`  ${chalk.dim('Output:'.padEnd(16))} ${formatNumber(tu.output)}`);
+    console.log(`  ${chalk.dim('Total:'.padEnd(16))} ${formatNumber(tu.total)}`);
   }
 
   if (detail.preview && detail.preview.length > 0) {

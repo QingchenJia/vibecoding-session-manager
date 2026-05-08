@@ -66,6 +66,9 @@ export class ClaudeCodeScanner extends BaseScanner {
       const userMessages: string[] = [];
       const assistantMessages: string[] = [];
       const preview: string[] = [];
+      let totalInput = 0;
+      let totalOutput = 0;
+      let totalCacheRead = 0;
 
       for (const line of lines) {
         let entry: Record<string, unknown>;
@@ -92,7 +95,22 @@ export class ClaudeCodeScanner extends BaseScanner {
               if (preview.length < 10) preview.push(`[assistant] ${combined.slice(0, 120)}`);
             }
           }
+          const usage = msg.usage as Record<string, unknown> | undefined;
+          if (usage) {
+            totalInput += (usage.input_tokens as number) || 0;
+            totalOutput += (usage.output_tokens as number) || 0;
+            totalCacheRead += (usage.cache_read_input_tokens as number) || 0;
+          }
         }
+      }
+
+      if (totalInput > 0 || totalOutput > 0) {
+        detail.tokenUsage = {
+          input: totalInput,
+          output: totalOutput,
+          total: totalInput + totalOutput + totalCacheRead,
+          cacheRead: totalCacheRead > 0 ? totalCacheRead : undefined,
+        };
       }
 
       detail.messageCount = userMessages.length + assistantMessages.length;
