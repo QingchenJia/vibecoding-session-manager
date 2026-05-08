@@ -19,6 +19,7 @@ export interface TokenUsage {
   output: number;
   total: number;
   cacheRead?: number;
+  cacheCreate?: number;
 }
 
 export interface SessionDetail {

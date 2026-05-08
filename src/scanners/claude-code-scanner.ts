@@ -69,6 +69,8 @@ export class ClaudeCodeScanner extends BaseScanner {
       let totalInput = 0;
       let totalOutput = 0;
       let totalCacheRead = 0;
+      let totalCacheCreate = 0;
+      let prevUsageKey = '';
 
       for (const line of lines) {
         let entry: Record<string, unknown>;
@@ -97,9 +99,14 @@ export class ClaudeCodeScanner extends BaseScanner {
           }
           const usage = msg.usage as Record<string, unknown> | undefined;
           if (usage) {
-            totalInput += (usage.input_tokens as number) || 0;
-            totalOutput += (usage.output_tokens as number) || 0;
-            totalCacheRead += (usage.cache_read_input_tokens as number) || 0;
+            const key = `${usage.input_tokens || 0}|${usage.output_tokens || 0}|${usage.cache_read_input_tokens || 0}|${usage.cache_creation_input_tokens || 0}`;
+            if (key !== prevUsageKey) {
+              totalInput += (usage.input_tokens as number) || 0;
+              totalOutput += (usage.output_tokens as number) || 0;
+              totalCacheRead += (usage.cache_read_input_tokens as number) || 0;
+              totalCacheCreate += (usage.cache_creation_input_tokens as number) || 0;
+              prevUsageKey = key;
+            }
           }
         }
       }
@@ -108,8 +115,9 @@ export class ClaudeCodeScanner extends BaseScanner {
         detail.tokenUsage = {
           input: totalInput,
           output: totalOutput,
-          total: totalInput + totalOutput + totalCacheRead,
+          total: totalInput + totalOutput + totalCacheRead + totalCacheCreate,
           cacheRead: totalCacheRead > 0 ? totalCacheRead : undefined,
+          cacheCreate: totalCacheCreate > 0 ? totalCacheCreate : undefined,
         };
       }
 
