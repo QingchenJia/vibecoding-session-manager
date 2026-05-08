@@ -158,9 +158,20 @@ vibe inspect <session-id> -a copilot  # Copilot: transcript summary and file pat
 Displays project name, session ID, path, last activity, size, first/last user message, message count, token usage (input/output/cached/total), preview, and raw file list.
 
 **Token usage** is displayed when the agent provides usage data:
-- **Claude Code** — accumulated from `message.usage` across all assistant entries in the JSONL session file. Shows input tokens, cache read tokens (if any), output tokens, and total (sum of all three).
-- **Codex** — read from the `tokens_used` column in `state_5.sqlite`. Supports JSON and plain-number formats.
-- **Copilot** — not displayed (token usage data is not available in Copilot session transcripts).
+
+- **Claude Code** — extracted from `message.usage` in assistant entries of the JSONL session file. Consecutive entries with identical `(input_tokens, output_tokens, cache_read_input_tokens)` values are deduplicated — each group represents a single API call, while subsequent entries are streaming chunks or tool-call iterations that share the same usage data.
+
+  **Fields displayed:**
+  - `Input` — sum of `input_tokens` (tokens not served from cache)
+  - `(xxx cached)` — sum of `cache_read_input_tokens` (tokens served from prompt cache)
+  - `Output` — sum of `output_tokens`
+  - `Total` = `input_tokens + output_tokens + cache_read_input_tokens + cache_creation_input_tokens`
+
+  **Note:** Session files are project-scoped rolling logs, accumulating data across multiple CLI sessions. Token totals reflect all conversations within the file, not just the most recent one.
+
+- **Codex** — read from the `tokens_used` column in `state_5.sqlite`. Supports JSON objects (`input_tokens`/`output_tokens`/`cache_read_input_tokens`) and plain number formats.
+
+- **Copilot** — not displayed (token usage data is not available in Copilot's `{role, content}` transcript format).
 
 #### `vibe search` — Full-text search across session content
 
