@@ -8,8 +8,8 @@ export class ScannerRegistry {
 
   constructor() {
     this.register(new ClaudeCodeScanner());
-    this.register(new CopilotScanner());
     this.register(new CodexScanner());
+    this.register(new CopilotScanner());
   }
 
   register(scanner: IScanner): void {

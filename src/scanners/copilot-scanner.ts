@@ -46,7 +46,17 @@ export class CopilotScanner extends BaseScanner {
       return sessions;
     }
 
-    const seenIds = new Set(sessions.map((s) => s.id));
+    // Track filenames already found in chatSessions per workspace hash to avoid duplicates
+    const seenByHash = new Map<string, Set<string>>();
+    for (const s of sessions) {
+      const dashIdx = s.id.indexOf('-');
+      if (dashIdx > 0) {
+        const h = s.id.slice(0, dashIdx);
+        const fn = s.id.slice(dashIdx + 1);
+        if (!seenByHash.has(h)) seenByHash.set(h, new Set());
+        seenByHash.get(h)!.add(fn);
+      }
+    }
 
     for (const hash of hashes) {
       const copilotTranscriptDir = path.join(
@@ -74,16 +84,17 @@ export class CopilotScanner extends BaseScanner {
         3,
       );
 
+      const hashSeen = seenByHash.get(hash);
       for (const filePath of transcriptFiles) {
         const stats = await this.getFileStats(filePath);
         if (stats.size === 0) continue;
 
         const filename = path.basename(filePath, path.extname(filePath));
-        const id = `${hash}-copilot-${filename}`;
-        if (seenIds.has(id)) continue;
+        // Skip if the same session file already exists in chatSessions
+        if (hashSeen?.has(filename)) continue;
 
         sessions.push({
-          id,
+          id: `${hash}-copilot-${filename}`,
           name: workspaceName,
           agent: 'copilot',
           path: filePath,
