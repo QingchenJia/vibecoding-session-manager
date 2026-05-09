@@ -246,45 +246,60 @@ function renderOverview(data) {
   grid.innerHTML = '';
   data.agents.forEach(function(agent) {
     var meta = AGENT_META[agent.agent] || { name: agent.agent, color: '#888', initial: '?' };
+    var q = agent.quota;
     var card = document.createElement('div');
     card.className = 'agent-card' + (currentAgent === agent.agent ? ' active' : '');
     card.style.setProperty('--agent-color', meta.color);
     card.setAttribute('data-agent', agent.agent);
-    card.innerHTML =
+
+    var html =
       '<div class="color-bar"></div>' +
       '<div class="agent-icon">' + meta.initial + '</div>' +
-      '<div class="agent-name">' + meta.name + '</div>' +
+      '<div class="agent-name">' + meta.name + '</div>';
+
+    // Quota info inside card
+    if (q) {
+      if (q.planType) {
+        html += '<div style="font-size:0.78rem;color:#888;margin-bottom:8px">' + q.planType;
+        if (q.subscriptionStart && q.subscriptionEnd) {
+          html += ' · ' + q.subscriptionStart + ' ~ ' + q.subscriptionEnd;
+        }
+        html += '</div>';
+      }
+      // Remaining quota bars
+      if (q.recentTokens5h != null) {
+        html += quotaBar('5h', q.recentTokens5h, meta.color);
+      }
+      if (q.recentTokens1w != null) {
+        html += quotaBar('1w', q.recentTokens1w, meta.color);
+      }
+    }
+
+    html +=
       '<div class="stat-row"><span>Sessions</span><span class="stat-value">' + agent.sessionCount + '</span></div>' +
       '<div class="stat-row"><span>Storage</span><span class="stat-value">' + formatBytes(agent.totalSize) + '</span></div>';
+
+    card.innerHTML = html;
     card.onclick = function() { loadDetail(agent.agent); };
     grid.appendChild(card);
   });
+}
 
-  /* Account bar */
-  var bar = document.getElementById('accountBar');
-  var accounts = data.agents.filter(function(a) { return a.quota && a.quota.planType; });
-  if (accounts.length > 0) {
-    bar.classList.remove('hidden');
-    bar.innerHTML = accounts.map(function(a) {
-      var meta = AGENT_META[a.agent] || { name: a.agent };
-      var q = a.quota;
-      var parts = ['<span class="label">' + meta.name + ':</span>'];
-      if (q.planType) parts.push('<span class="value">' + q.planType + '</span>');
-      if (q.subscriptionStart && q.subscriptionEnd) {
-        parts.push('<span class="label">' + q.subscriptionStart + ' ~ ' + q.subscriptionEnd + '</span>');
-      }
-      if (q.recentTokens5h != null || q.recentTokens1w != null) {
-        var usage = [];
-        if (q.recentTokens5h != null) usage.push('<span style="color:#10A37F">5h:</span> ' + formatTokens(q.recentTokens5h));
-        if (q.recentTokens1w != null) usage.push('<span style="color:#00B8D4">1w:</span> ' + formatTokens(q.recentTokens1w));
-        parts.push('<span class="label">Usage</span> <span class="value">' + usage.join('  ') + '</span>');
-      }
-      return '<span>' + parts.join(' ') + '</span>';
-    }).join('');
-  } else {
-    bar.classList.add('hidden');
-    bar.innerHTML = '';
-  }
+function quotaBar(label, usedTokens, color) {
+  // ChatGPT Plus approximate limits (tokens)
+  var limits = { '5h': 4000000, '1w': 50000000 };
+  var limit = limits[label] || 4000000;
+  var remaining = Math.max(0, Math.min(100, Math.round((1 - usedTokens / limit) * 100)));
+  var barColor = remaining > 50 ? '#10A37F' : remaining > 20 ? '#f0a030' : '#e55';
+  return '<div style="margin-bottom:6px">' +
+    '<div style="display:flex;justify-content:space-between;font-size:0.75rem;margin-bottom:3px">' +
+      '<span style="color:#888">' + label + '</span>' +
+      '<span style="color:' + barColor + ';font-weight:500">' + remaining + '%</span>' +
+    '</div>' +
+    '<div style="height:4px;background:rgba(255,255,255,0.08);border-radius:2px;overflow:hidden">' +
+      '<div style="height:100%;width:' + remaining + '%;background:' + barColor + ';border-radius:2px;transition:width 0.3s"></div>' +
+    '</div>' +
+  '</div>';
 }
 
 /* Render Detail */
