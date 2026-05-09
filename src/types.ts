@@ -68,3 +68,41 @@ export interface PlatformInfo {
   xdgDataHome: string | null;
   xdgConfigHome: string | null;
 }
+
+export interface QuotaInfo {
+  agent: AgentType;
+  planType?: string;
+  subscriptionStart?: string;
+  subscriptionEnd?: string;
+  totalInputTokens?: number;
+  totalOutputTokens?: number;
+  dailyActivity?: Array<{
+    date: string;
+    messageCount: number;
+    sessionCount: number;
+  }>;
+}
+
+export interface AgentStatsData {
+  agent: AgentType;
+  sessionCount: number;
+  totalSize: number;
+  oldestSession?: { name: string; lastModified: number };
+  newestSession?: { name: string; lastModified: number };
+  quota?: QuotaInfo;
+}
+
+export interface DashboardData {
+  agents: AgentStatsData[];
+  totalSessions: number;
+  totalSize: number;
+}
+
+export interface SessionTokenData {
+  id: string;
+  name: string;
+  size: number;
+  lastModified: number;
+  tokenUsage?: TokenUsage;
+  messageCount?: number;
+}
