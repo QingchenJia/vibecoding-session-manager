@@ -139,13 +139,24 @@ vibe prune -d 30 --agent copilot   # only prune Copilot sessions
 vibe prune -d 30 --dry-run         # preview: show what would be deleted, no action
 ```
 
-#### `vibe stats` — Disk usage summary
+#### `vibe stats` — Web dashboard for session statistics
 
 ```bash
-vibe stats
+vibe stats                # launch dashboard (random port)
+vibe stats --port 3000    # specify port
 ```
 
-Shows per-agent breakdown: session count, total size, oldest session, newest session, and grand total.
+Launches a local web server and opens a browser dashboard showing:
+
+- **Overview cards** — per-agent session count and storage size
+- **Account info** — plan type, subscription period (detected from local auth files)
+- **Quota tracking** — for Codex (ChatGPT Plus), shows real-time remaining quota for 5-hour and 1-week windows as progress bars (fetched from `chatgpt.com/backend-api/codex/usage`)
+- **Token usage** — click an agent card to load token breakdown (input, cache hit, cache create, output) for each session, with sortable columns
+- **Session detail** — click a session row to view full detail (messages, token usage, preview)
+
+The dashboard uses a dark theme with agent brand colors (Claude Code orange, Copilot cyan, Codex green) and supports responsive layout.
+
+Quota data is cached for 30 seconds to avoid excessive API calls on repeated refreshes. Press `Ctrl+C` in the terminal to stop the server.
 
 #### `vibe inspect` — Show detailed session information
 
@@ -282,10 +293,14 @@ src/
 ├── doctor/
 │   ├── doctor.ts               # Health check: path existence, permissions, orphan detection
 │   └── display.ts              # Health check result display
-└── ui/
-    ├── display.ts              # Terminal output: tables, colors, stats formatting
-    ├── inspect.ts              # Session detail inspection display
-    └── interactive.ts          # Interactive deletion UI: checkboxes, confirmations
+├── ui/
+│   ├── display.ts              # Terminal output: tables, colors, stats formatting
+│   ├── inspect.ts              # Session detail inspection display
+│   └── interactive.ts          # Interactive deletion UI: checkboxes, confirmations
+└── web/
+    ├── server.ts               # HTTP server, API routes, browser launch
+    ├── html.ts                 # Dashboard HTML/CSS/JS (inline template string)
+    └── quota.ts                # Account detection and quota fetching (Claude Code, Codex)
 ```
 
 ### Architecture
