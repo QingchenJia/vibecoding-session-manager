@@ -5,12 +5,32 @@ import { ScannerRegistry } from '../scanners/registry.js';
 import { readClaudeQuota, readCodexQuota, readCopilotQuota } from './quota.js';
 import { getDashboardHtml } from './html.js';
 
+const QUOTA_CACHE_TTL = 30_000; // 30 seconds
+
 export async function startServer(options: {
   groups: SessionGroup[];
   port?: number;
 }): Promise<void> {
   const { groups, port } = options;
   const registry = new ScannerRegistry();
+
+  // Quota cache to avoid hitting external APIs on every refresh
+  const quotaCache = new Map<AgentType, { data: import('../types.js').QuotaInfo | undefined; ts: number }>();
+
+  async function getCachedQuota(agent: AgentType): Promise<import('../types.js').QuotaInfo | undefined> {
+    const cached = quotaCache.get(agent);
+    if (cached && Date.now() - cached.ts < QUOTA_CACHE_TTL) {
+      return cached.data;
+    }
+    const quotaFns: Record<AgentType, () => Promise<import('../types.js').QuotaInfo | undefined>> = {
+      cc: readClaudeQuota,
+      codex: readCodexQuota,
+      copilot: readCopilotQuota,
+    };
+    const data = await quotaFns[agent]();
+    quotaCache.set(agent, { data, ts: Date.now() });
+    return data;
+  }
 
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url || '/', `http://localhost`);
@@ -24,16 +44,11 @@ export async function startServer(options: {
 
       if (url.pathname === '/api/stats') {
         const agents = [];
-        const quotaFns: Record<AgentType, () => Promise<import('../types.js').QuotaInfo | undefined>> = {
-          cc: readClaudeQuota,
-          codex: readCodexQuota,
-          copilot: readCopilotQuota,
-        };
 
         for (const group of groups) {
           const totalSize = group.sessions.reduce((s, sess) => s + sess.size, 0);
           const sorted = [...group.sessions].sort((a, b) => a.lastModified - b.lastModified);
-          const quota = await quotaFns[group.agent]();
+          const quota = await getCachedQuota(group.agent);
 
           agents.push({
             agent: group.agent,
