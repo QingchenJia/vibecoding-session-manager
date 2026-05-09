@@ -273,6 +273,12 @@ function renderOverview(data) {
       if (q.subscriptionStart && q.subscriptionEnd) {
         parts.push('<span class="label">' + q.subscriptionStart + ' ~ ' + q.subscriptionEnd + '</span>');
       }
+      if (q.recentTokens5h != null || q.recentTokens1w != null) {
+        var usage = [];
+        if (q.recentTokens5h != null) usage.push('<span style="color:#10A37F">5h:</span> ' + formatTokens(q.recentTokens5h));
+        if (q.recentTokens1w != null) usage.push('<span style="color:#00B8D4">1w:</span> ' + formatTokens(q.recentTokens1w));
+        parts.push('<span class="label">Usage</span> <span class="value">' + usage.join('  ') + '</span>');
+      }
       return '<span>' + parts.join(' ') + '</span>';
     }).join('');
   } else {

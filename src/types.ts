@@ -76,6 +76,8 @@ export interface QuotaInfo {
   subscriptionEnd?: string;
   totalInputTokens?: number;
   totalOutputTokens?: number;
+  recentTokens5h?: number;
+  recentTokens1w?: number;
   dailyActivity?: Array<{
     date: string;
     messageCount: number;

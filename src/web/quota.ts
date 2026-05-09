@@ -3,6 +3,10 @@ import path from 'node:path';
 import os from 'node:os';
 import type { QuotaInfo } from '../types.js';
 
+// Rolling window durations
+const H5_MS = 5 * 60 * 60 * 1000;
+const W1_MS = 7 * 24 * 60 * 60 * 1000;
+
 export async function readClaudeQuota(): Promise<QuotaInfo | undefined> {
   const home = os.homedir();
   const statsPath = path.join(home, '.claude', 'stats-cache.json');
@@ -68,17 +72,46 @@ export async function readCodexQuota(): Promise<QuotaInfo | undefined> {
     if (auth.tokens?.id_token) {
       try {
         const payload = decodeJwtPayload(auth.tokens.id_token);
-        if (payload.chatgpt_plan_type) {
-          quota.planType = String(payload.chatgpt_plan_type).toUpperCase();
+        const authData = payload['https://api.openai.com/auth'] as Record<string, unknown> | undefined;
+        if (authData?.chatgpt_plan_type) {
+          quota.planType = String(authData.chatgpt_plan_type).toUpperCase();
         }
-        if (payload.chatgpt_subscription_active_start) {
-          quota.subscriptionStart = String(payload.chatgpt_subscription_active_start);
+        if (authData?.chatgpt_subscription_active_start) {
+          quota.subscriptionStart = String(authData.chatgpt_subscription_active_start).slice(0, 10);
         }
-        if (payload.chatgpt_subscription_active_until) {
-          quota.subscriptionEnd = String(payload.chatgpt_subscription_active_until);
+        if (authData?.chatgpt_subscription_active_until) {
+          quota.subscriptionEnd = String(authData.chatgpt_subscription_active_until).slice(0, 10);
         }
       } catch { /* JWT decode failed */ }
     }
+
+    // 从 SQLite 查询滚动窗口 token 用量
+    const dbPath = path.join(home, '.codex', 'state_5.sqlite');
+    try {
+      const { default: Database } = await import('better-sqlite3');
+      const db = new Database(dbPath, { readonly: true });
+      const now = Date.now();
+      const cutoff5h = now - H5_MS;
+      const cutoff1w = now - W1_MS;
+
+      const rows = db.prepare(
+        'SELECT tokens_used, updated_at_ms, updated_at FROM threads'
+      ).all() as Array<{ tokens_used: number | null; updated_at_ms: number | null; updated_at: number | null }>;
+      db.close();
+
+      let tokens5h = 0;
+      let tokens1w = 0;
+      for (const row of rows) {
+        const updated = row.updated_at_ms || (row.updated_at ? row.updated_at * 1000 : 0);
+        if (!updated) continue;
+        const tokens = row.tokens_used || 0;
+        if (updated >= cutoff1w) tokens1w += tokens;
+        if (updated >= cutoff5h) tokens5h += tokens;
+      }
+
+      if (tokens5h > 0) quota.recentTokens5h = tokens5h;
+      if (tokens1w > 0) quota.recentTokens1w = tokens1w;
+    } catch { /* SQLite not available */ }
 
     return quota;
   } catch {
