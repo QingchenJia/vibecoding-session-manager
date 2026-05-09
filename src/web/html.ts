@@ -352,8 +352,8 @@ function renderTokenTable(agent, sessions, meta) {
         if (s.tokenUsage) {
           var t = s.tokenUsage;
           var total = (t.input||0) + (t.output||0) + (t.cacheRead||0) + (t.cacheCreate||0);
-          tokenStr = formatTokens(total);
-          if (t.cacheRead) tokenStr += ' <span style="color:#888;font-size:0.75rem">(' + formatTokens(t.cacheRead) + ' cached)</span>';
+          tokenStr = formatTokens(total) + '-' + formatTokens(t.output||0) + '/' + formatTokens(t.input||0);
+          if (t.cacheRead) tokenStr += '(' + formatTokens(t.cacheRead) + ')';
         }
         return '<tr class="session-row" onclick="openSession(\\''+agent+'\\',\\''+s.id+'\\')">' +
           '<td style="max-width:120px;overflow:hidden;text-overflow:ellipsis" title="'+s.id+'">' + s.id.slice(0, 12) + '</td>' +
