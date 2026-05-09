@@ -287,8 +287,8 @@ function renderOverview(data) {
 
 function quotaBar(label, usedTokens, color) {
   // ChatGPT Plus approximate limits (tokens)
-  var limits = { '5h': 4000000, '1w': 50000000 };
-  var limit = limits[label] || 4000000;
+  var limits = { '5h': 23500000, '1w': 28300000 };
+  var limit = limits[label] || 23500000;
   var remaining = Math.max(0, Math.min(100, Math.round((1 - usedTokens / limit) * 100)));
   var barColor = remaining > 50 ? '#10A37F' : remaining > 20 ? '#f0a030' : '#e55';
   return '<div style="margin-bottom:6px">' +
