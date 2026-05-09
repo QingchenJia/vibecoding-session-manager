@@ -352,14 +352,24 @@ function renderTokenTable(agent, sessions, meta) {
         if (s.tokenUsage) {
           var t = s.tokenUsage;
           var total = (t.input||0) + (t.output||0) + (t.cacheRead||0) + (t.cacheCreate||0);
-          tokenStr = formatTokens(total) + '-' + formatTokens(t.output||0) + '/' + formatTokens(t.input||0);
-          if (t.cacheRead) tokenStr += '(' + formatTokens(t.cacheRead) + ')';
+          tokenStr = '<div style="line-height:1.4">' +
+            '<div style="font-weight:500">' + formatTokens(total) + '</div>' +
+            '<div style="font-size:0.75rem;color:#888">' +
+              '<span style="color:#e0e0e0">' + formatTokens(t.output||0) + '</span>' +
+              '<span style="color:#555"> out</span>' +
+              ' <span style="color:#555; margin:0 2px">|</span> ' +
+              '<span style="color:#e0e0e0">' + formatTokens(t.input||0) + '</span>' +
+              '<span style="color:#555"> in</span>';
+          if (t.cacheRead) {
+            tokenStr += ' <span style="color:#555">(</span><span style="color:#10A37F">' + formatTokens(t.cacheRead) + '</span><span style="color:#555"> hit)</span>';
+          }
+          tokenStr += '</div></div>';
         }
         return '<tr class="session-row" onclick="openSession(\\''+agent+'\\',\\''+s.id+'\\')">' +
           '<td style="max-width:120px;overflow:hidden;text-overflow:ellipsis" title="'+s.id+'">' + s.id.slice(0, 12) + '</td>' +
           '<td>' + (s.name || '-') + '</td>' +
           '<td>' + formatBytes(s.size) + '</td>' +
-          '<td>' + tokenStr + '</td>' +
+          '<td style="white-space:normal;padding-top:6px;padding-bottom:6px">' + tokenStr + '</td>' +
           '<td>' + formatRelativeTime(s.lastModified) + '</td>' +
         '</tr>';
       }).join('') +
