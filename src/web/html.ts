@@ -267,11 +267,15 @@ function renderOverview(data) {
         html += '</div>';
       }
       // Remaining quota bars
-      if (q.recentTokens5h != null) {
-        html += quotaBar('5h', q.recentTokens5h, meta.color);
+      if (q.remaining5hPercent != null) {
+        html += quotaBar('5h', q.remaining5hPercent);
+      } else if (q.recentTokens5h != null) {
+        html += quotaBarFallback('5h', q.recentTokens5h);
       }
-      if (q.recentTokens1w != null) {
-        html += quotaBar('1w', q.recentTokens1w, meta.color);
+      if (q.remaining1wPercent != null) {
+        html += quotaBar('1w', q.remaining1wPercent);
+      } else if (q.recentTokens1w != null) {
+        html += quotaBarFallback('1w', q.recentTokens1w);
       }
     }
 
@@ -285,11 +289,8 @@ function renderOverview(data) {
   });
 }
 
-function quotaBar(label, usedTokens, color) {
-  // ChatGPT Plus approximate limits (tokens)
-  var limits = { '5h': 23500000, '1w': 28300000 };
-  var limit = limits[label] || 23500000;
-  var remaining = Math.max(0, Math.min(100, Math.round((1 - usedTokens / limit) * 100)));
+function quotaBar(label, remainingPercent) {
+  var remaining = Math.max(0, Math.min(100, remainingPercent));
   var barColor = remaining > 50 ? '#10A37F' : remaining > 20 ? '#f0a030' : '#e55';
   return '<div style="margin-bottom:6px">' +
     '<div style="display:flex;justify-content:space-between;font-size:0.75rem;margin-bottom:3px">' +
@@ -300,6 +301,13 @@ function quotaBar(label, usedTokens, color) {
       '<div style="height:100%;width:' + remaining + '%;background:' + barColor + ';border-radius:2px;transition:width 0.3s"></div>' +
     '</div>' +
   '</div>';
+}
+
+function quotaBarFallback(label, usedTokens) {
+  var limits = { '5h': 23500000, '1w': 28300000 };
+  var limit = limits[label] || 23500000;
+  var remaining = Math.max(0, Math.min(100, Math.round((1 - usedTokens / limit) * 100)));
+  return quotaBar(label, remaining);
 }
 
 /* Render Detail */

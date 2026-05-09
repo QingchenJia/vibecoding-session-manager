@@ -78,6 +78,8 @@ export interface QuotaInfo {
   totalOutputTokens?: number;
   recentTokens5h?: number;
   recentTokens1w?: number;
+  remaining5hPercent?: number;
+  remaining1wPercent?: number;
   dailyActivity?: Array<{
     date: string;
     messageCount: number;

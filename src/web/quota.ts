@@ -1,11 +1,8 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
+import https from 'node:https';
 import type { QuotaInfo } from '../types.js';
-
-// Rolling window durations
-const H5_MS = 5 * 60 * 60 * 1000;
-const W1_MS = 7 * 24 * 60 * 60 * 1000;
 
 export async function readClaudeQuota(): Promise<QuotaInfo | undefined> {
   const home = os.homedir();
@@ -20,7 +17,6 @@ export async function readClaudeQuota(): Promise<QuotaInfo | undefined> {
       planType: 'Claude Code',
     };
 
-    // 解析 modelUsage 获取总 token 用量
     if (stats.modelUsage && typeof stats.modelUsage === 'object') {
       let totalInput = 0;
       let totalOutput = 0;
@@ -34,7 +30,6 @@ export async function readClaudeQuota(): Promise<QuotaInfo | undefined> {
       }
     }
 
-    // 解析 dailyActivity
     if (Array.isArray(stats.dailyActivity)) {
       quota.dailyActivity = stats.dailyActivity.map((d: Record<string, unknown>) => ({
         date: d.date as string,
@@ -43,7 +38,6 @@ export async function readClaudeQuota(): Promise<QuotaInfo | undefined> {
       }));
     }
 
-    // 读取 settings.json 检测是否使用代理
     const settingsPath = path.join(home, '.claude', 'settings.json');
     try {
       const settings = JSON.parse(await fs.readFile(settingsPath, 'utf-8'));
@@ -85,33 +79,23 @@ export async function readCodexQuota(): Promise<QuotaInfo | undefined> {
       } catch { /* JWT decode failed */ }
     }
 
-    // 从 SQLite 查询滚动窗口 token 用量
-    const dbPath = path.join(home, '.codex', 'state_5.sqlite');
-    try {
-      const { default: Database } = await import('better-sqlite3');
-      const db = new Database(dbPath, { readonly: true });
-      const now = Date.now();
-      const cutoff5h = now - H5_MS;
-      const cutoff1w = now - W1_MS;
-
-      const rows = db.prepare(
-        'SELECT tokens_used, updated_at_ms, updated_at FROM threads'
-      ).all() as Array<{ tokens_used: number | null; updated_at_ms: number | null; updated_at: number | null }>;
-      db.close();
-
-      let tokens5h = 0;
-      let tokens1w = 0;
-      for (const row of rows) {
-        const updated = row.updated_at_ms || (row.updated_at ? row.updated_at * 1000 : 0);
-        if (!updated) continue;
-        const tokens = row.tokens_used || 0;
-        if (updated >= cutoff1w) tokens1w += tokens;
-        if (updated >= cutoff5h) tokens5h += tokens;
-      }
-
-      if (tokens5h > 0) quota.recentTokens5h = tokens5h;
-      if (tokens1w > 0) quota.recentTokens1w = tokens1w;
-    } catch { /* SQLite not available */ }
+    // 调用 ChatGPT API 获取实时配额
+    if (auth.tokens?.access_token) {
+      try {
+        const usage = await fetchCodexUsage(auth.tokens.access_token);
+        if (usage?.rate_limit) {
+          const rl = usage.rate_limit as Record<string, unknown>;
+          const primary = rl.primary_window as Record<string, unknown> | undefined;
+          const secondary = rl.secondary_window as Record<string, unknown> | undefined;
+          if (primary?.used_percent != null) {
+            quota.remaining5hPercent = 100 - (primary.used_percent as number);
+          }
+          if (secondary?.used_percent != null) {
+            quota.remaining1wPercent = 100 - (secondary.used_percent as number);
+          }
+        }
+      } catch { /* API call failed */ }
+    }
 
     return quota;
   } catch {
@@ -120,8 +104,35 @@ export async function readCodexQuota(): Promise<QuotaInfo | undefined> {
 }
 
 export async function readCopilotQuota(): Promise<QuotaInfo | undefined> {
-  // Copilot 没有本地额度文件
   return undefined;
+}
+
+function fetchCodexUsage(accessToken: string): Promise<Record<string, unknown> | undefined> {
+  return new Promise((resolve) => {
+    const req = https.request({
+      hostname: 'chatgpt.com',
+      path: '/backend-api/codex/usage',
+      method: 'GET',
+      headers: {
+        'Authorization': 'Bearer ' + accessToken,
+        'Content-Type': 'application/json',
+        'User-Agent': 'codex-cli/0.129.0',
+      },
+    }, (res) => {
+      let data = '';
+      res.on('data', (c: Buffer) => data += c);
+      res.on('end', () => {
+        if (res.statusCode === 200) {
+          try { resolve(JSON.parse(data)); } catch { resolve(undefined); }
+        } else {
+          resolve(undefined);
+        }
+      });
+    });
+    req.on('error', () => resolve(undefined));
+    req.setTimeout(10000, () => { req.destroy(); resolve(undefined); });
+    req.end();
+  });
 }
 
 function decodeJwtPayload(token: string): Record<string, unknown> {
