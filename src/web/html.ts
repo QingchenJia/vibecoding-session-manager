@@ -392,6 +392,9 @@ function renderTokenTable(agent, sessions, meta) {
           if (t.cacheRead) {
             tokenStr += ' <span style="color:#555">(</span><span style="color:#10A37F">' + formatTokens(t.cacheRead) + '</span><span style="color:#555"> hit)</span>';
           }
+          if (t.cacheCreate) {
+            tokenStr += ' <span style="color:#555">+</span><span style="color:#f0a030">' + formatTokens(t.cacheCreate) + '</span><span style="color:#555"> new</span>';
+          }
           tokenStr += '</div></div>';
         }
         return '<tr class="session-row" onclick="openSession(\\''+agent+'\\',\\''+s.id+'\\')">' +
@@ -477,11 +480,11 @@ function renderModal(detail) {
   html += metaItem('Size', formatBytes(s.size || 0));
   html += metaItem('Messages', detail.messageCount != null ? detail.messageCount : '-');
   html += metaItem('Input', formatTokens(tu.input));
-  if (tu.cacheRead) html += metaItem('Cache Hit', formatTokens(tu.cacheRead));
-  if (tu.cacheCreate) html += metaItem('Cache Create', formatTokens(tu.cacheCreate));
+  html += metaItem('Cache Hit', formatTokens(tu.cacheRead));
+  html += metaItem('Cache Create', formatTokens(tu.cacheCreate));
   html += metaItem('Output', formatTokens(tu.output));
   var modalTotal = (tu.input||0) + (tu.output||0) + (tu.cacheRead||0) + (tu.cacheCreate||0);
-  html += metaItem('Total', formatTokens(modalTotal));
+  html += metaItem('Total', formatTokens(modalTotal || undefined));
   html += metaItem('Last Modified', formatRelativeTime(s.lastModified));
   html += '</div>';
 

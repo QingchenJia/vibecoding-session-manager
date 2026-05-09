@@ -37,12 +37,14 @@ export function displayInspect(detail: SessionDetail): void {
 
   if (detail.tokenUsage) {
     const tu = detail.tokenUsage;
-    const cacheStr = tu.cacheRead ? ` (${formatNumber(tu.cacheRead)} cached)` : '';
+    const fmt = (n: number | undefined) => (n != null && n > 0) ? formatNumber(n) : '-';
     console.log('');
     console.log(chalk.bold('  Token Usage:'));
-    console.log(`  ${chalk.dim('Input:'.padEnd(16))} ${formatNumber(tu.input)}${chalk.dim(cacheStr)}`);
-    console.log(`  ${chalk.dim('Output:'.padEnd(16))} ${formatNumber(tu.output)}`);
-    console.log(`  ${chalk.dim('Total:'.padEnd(16))} ${formatNumber(tu.total)}`);
+    console.log(`  ${chalk.dim('Input:'.padEnd(16))} ${fmt(tu.input)}`);
+    console.log(`  ${chalk.dim('Cache Hit:'.padEnd(16))} ${fmt(tu.cacheRead)}`);
+    console.log(`  ${chalk.dim('Cache Create:'.padEnd(16))} ${fmt(tu.cacheCreate)}`);
+    console.log(`  ${chalk.dim('Output:'.padEnd(16))} ${fmt(tu.output)}`);
+    console.log(`  ${chalk.dim('Total:'.padEnd(16))} ${fmt(tu.total)}`);
   }
 
   if (detail.preview && detail.preview.length > 0) {

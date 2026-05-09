@@ -28,8 +28,10 @@ export async function startServer(options: {
       copilot: readCopilotQuota,
     };
     const data = await quotaFns[agent]();
-    quotaCache.set(agent, { data, ts: Date.now() });
-    return data;
+    if (data || !cached) {
+      quotaCache.set(agent, { data, ts: Date.now() });
+    }
+    return data ?? cached?.data;
   }
 
   const server = http.createServer(async (req, res) => {

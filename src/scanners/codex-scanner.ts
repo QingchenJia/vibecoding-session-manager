@@ -149,7 +149,7 @@ export class CodexScanner extends BaseScanner {
           detail.tokenUsage = this.parseTokenUsage(row.tokens_used);
           const rp = row.rollout_path as string;
           if (rp) {
-            const fullRp = path.join(this.codexDir, rp);
+            const fullRp = path.isAbsolute(rp) ? rp : path.join(this.codexDir, rp);
             if (!isRolloutPath && await this.fileExists(fullRp)) {
               detail.rawFiles!.push(fullRp);
             }
@@ -176,6 +176,8 @@ export class CodexScanner extends BaseScanner {
       const lines = rc.split('\n').filter((l) => l.trim());
       let msgCount = 0;
       const preview: string[] = [];
+      let lastInputTokens = 0;
+      let lastOutputTokens = 0;
 
       for (const l of lines) {
         try {
@@ -191,11 +193,26 @@ export class CodexScanner extends BaseScanner {
               }
             }
           }
+          if (e.type === 'event_msg' && e.payload?.type === 'token_count') {
+            const total = e.payload?.info?.total_token_usage;
+            if (total) {
+              lastInputTokens = (total.input_tokens as number) || 0;
+              lastOutputTokens = (total.output_tokens as number) || 0;
+            }
+          }
         } catch { continue; }
       }
 
       detail.messageCount = msgCount;
       detail.preview = preview;
+
+      if (lastInputTokens > 0 || lastOutputTokens > 0) {
+        detail.tokenUsage = {
+          input: lastInputTokens,
+          output: lastOutputTokens,
+          total: lastInputTokens + lastOutputTokens,
+        };
+      }
     } catch { /* skip */ }
   }
 

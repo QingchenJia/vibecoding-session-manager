@@ -156,7 +156,7 @@ Launches a local web server and opens a browser dashboard showing:
 
 The dashboard uses a dark theme with agent brand colors (Claude Code orange, Copilot cyan, Codex green) and supports responsive layout.
 
-Quota data is cached for 30 seconds to avoid excessive API calls on repeated refreshes. Press `Ctrl+C` in the terminal to stop the server.
+Quota data is cached for 30 seconds to avoid excessive API calls on repeated refreshes. If an API call fails after the cache expires, the last successful data is preserved and displayed until the next successful fetch. Press `Ctrl+C` in the terminal to stop the server.
 
 #### `vibe inspect` — Show detailed session information
 
@@ -172,17 +172,20 @@ Displays project name, session ID, path, last activity, size, first/last user me
 
 - **Claude Code** — extracted from `message.usage` in assistant entries of the JSONL session file. Consecutive entries with identical `(input_tokens, output_tokens, cache_read_input_tokens)` values are deduplicated — each group represents a single API call, while subsequent entries are streaming chunks or tool-call iterations that share the same usage data.
 
-  **Fields displayed:**
-  - `Input` — sum of `input_tokens` (tokens not served from cache)
-  - `(xxx cached)` — sum of `cache_read_input_tokens` (tokens served from prompt cache)
-  - `Output` — sum of `output_tokens`
-  - `Total` = `input_tokens + output_tokens + cache_read_input_tokens + cache_creation_input_tokens`
+  **Fields displayed (all agents, unified format):**
+  - `Input` — input tokens (not served from cache)
+  - `Cache Hit` — tokens served from prompt cache (`cache_read_input_tokens`)
+  - `Cache Create` — tokens used to create prompt cache (`cache_creation_input_tokens`)
+  - `Output` — output tokens
+  - `Total` — sum of all above
+
+  Fields unavailable from an agent's data source are displayed as "-".
 
   **Note:** Session files are project-scoped rolling logs, accumulating data across multiple CLI sessions. Token totals reflect all conversations within the file, not just the most recent one.
 
-- **Codex** — read from the `tokens_used` column in `state_5.sqlite`. Supports JSON objects (`input_tokens`/`output_tokens`/`cache_read_input_tokens`) and plain number formats.
+- **Codex** — input and output tokens extracted from `token_count` events in rollout JSONL files (cumulative values, last event used). Cache hit/create not available from Codex data source, displayed as "-". Falls back to `tokens_used` in `state_5.sqlite` (plain total number) when rollout data is unavailable.
 
-- **Copilot** — not displayed (token usage data is not available in Copilot's `{role, content}` transcript format).
+- **Copilot** — output tokens extracted from `completionTokens` field in VS Code chatSessions JSONL. Input, cache hit, and cache create are not available from Copilot's data source, displayed as "-". Only chatSessions format contains token data; transcript format does not.
 
 #### `vibe search` — Full-text search across session content
 
@@ -266,7 +269,7 @@ Scanners gracefully return no results when an agent is not installed on the mach
 
 **Codex (OpenAI)** — Sessions indexed in `~/.codex/session_index.jsonl`. Actual data in shared SQLite databases (`logs_2.sqlite`, `state_5.sqlite`) and per-session rollout files under `~/.codex/sessions/`. Deleting removes index entry, SQLite records, and rollout files. Skills: `~/.codex/skills/<name>/SKILL.md`, with built-in skills under `.system/` subdirectory.
 
-**GitHub Copilot** — Sessions stored in VS Code workspace storage with additional `GitHub.copilot-chat/transcripts/` directories. Skills: `~/.copilot/skills/<name>/SKILL.md`. Note: Copilot may also discover skills from other agents' directories at runtime.
+**GitHub Copilot** — Sessions stored in VS Code workspace storage under `chatSessions/` and `GitHub.copilot-chat/transcripts/` directories. Duplicate sessions across these directories are automatically deduplicated by filename. Skills: `~/.copilot/skills/<name>/SKILL.md`. Note: Copilot may also discover skills from other agents' directories at runtime.
 
 ### Project Structure
 

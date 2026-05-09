@@ -118,26 +118,48 @@ export class CopilotScanner extends BaseScanner {
       const preview: string[] = [];
       let userCount = 0;
       let assistantCount = 0;
+      let totalCompletionTokens = 0;
+
+      const isChatSession = session.path.includes('chatSessions');
 
       for (const line of lines) {
         try {
           const e = JSON.parse(line);
-          const role = e.role as string;
-          const text = e.content as string;
-          if (role === 'user' && text) {
-            userCount++;
-            if (!detail.firstUserMessage) detail.firstUserMessage = text;
-            detail.lastUserMessage = text;
-            if (preview.length < 10) preview.push(`[user] ${text.slice(0, 120)}`);
-          } else if (role === 'assistant' && text) {
-            assistantCount++;
-            if (preview.length < 10) preview.push(`[assistant] ${text.slice(0, 120)}`);
+
+          if (isChatSession) {
+            if (e.k && e.k[0] === 'requests' && Array.isArray(e.v)) {
+              for (const req of e.v) {
+                if (typeof req.completionTokens === 'number' && req.completionTokens > 0) {
+                  totalCompletionTokens += req.completionTokens;
+                }
+              }
+            }
+          } else {
+            const role = e.role as string;
+            const text = e.content as string;
+            if (role === 'user' && text) {
+              userCount++;
+              if (!detail.firstUserMessage) detail.firstUserMessage = text;
+              detail.lastUserMessage = text;
+              if (preview.length < 10) preview.push(`[user] ${text.slice(0, 120)}`);
+            } else if (role === 'assistant' && text) {
+              assistantCount++;
+              if (preview.length < 10) preview.push(`[assistant] ${text.slice(0, 120)}`);
+            }
           }
         } catch { continue; }
       }
 
       detail.messageCount = userCount + assistantCount;
       detail.preview = preview;
+
+      if (totalCompletionTokens > 0) {
+        detail.tokenUsage = {
+          input: 0,
+          output: totalCompletionTokens,
+          total: totalCompletionTokens,
+        };
+      }
     } catch { /* best effort */ }
 
     return detail;
