@@ -7,6 +7,11 @@ export function getDashboardHtml(): string {
 <title>Vibe Session Stats</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.15);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.25)}
+*{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.15) transparent}
 body{
   font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
   background:#1a1a2e;color:#e0e0e0;min-height:100vh;
@@ -306,19 +311,23 @@ function renderTokenTable(agent, sessions, meta) {
   var section = document.getElementById('detailSection');
 
   /* Compute totals */
-  var totalInput = 0, totalOutput = 0;
+  var totalInput = 0, totalOutput = 0, totalCacheRead = 0, totalCacheCreate = 0;
   sessions.forEach(function(s) {
     if (s.tokenUsage) {
       totalInput += s.tokenUsage.input || 0;
       totalOutput += s.tokenUsage.output || 0;
+      totalCacheRead += s.tokenUsage.cacheRead || 0;
+      totalCacheCreate += s.tokenUsage.cacheCreate || 0;
     }
   });
 
   var summaryHtml =
     '<div class="token-summary">' +
-      tokenBox('Total Input', formatTokens(totalInput)) +
-      tokenBox('Total Output', formatTokens(totalOutput)) +
-      tokenBox('Total Tokens', formatTokens(totalInput + totalOutput)) +
+      tokenBox('Input', formatTokens(totalInput)) +
+      tokenBox('Cache Hit', formatTokens(totalCacheRead)) +
+      tokenBox('Cache Create', formatTokens(totalCacheCreate)) +
+      tokenBox('Output', formatTokens(totalOutput)) +
+      tokenBox('Total', formatTokens(totalInput + totalOutput + totalCacheRead + totalCacheCreate)) +
       tokenBox('Sessions', sessions.length) +
     '</div>';
 
@@ -339,9 +348,13 @@ function renderTokenTable(agent, sessions, meta) {
         th('tokens', 'Token Usage') + th('lastModified', 'Last Active') +
       '</tr></thead><tbody>' +
       sorted.map(function(s) {
-        var tokenStr = s.tokenUsage
-          ? formatTokens(s.tokenUsage.input) + ' / ' + formatTokens(s.tokenUsage.output)
-          : '-';
+        var tokenStr = '-';
+        if (s.tokenUsage) {
+          var t = s.tokenUsage;
+          var total = (t.input||0) + (t.output||0) + (t.cacheRead||0) + (t.cacheCreate||0);
+          tokenStr = formatTokens(total);
+          if (t.cacheRead) tokenStr += ' <span style="color:#888;font-size:0.75rem">(' + formatTokens(t.cacheRead) + ' cached)</span>';
+        }
         return '<tr class="session-row" onclick="openSession(\\''+agent+'\\',\\''+s.id+'\\')">' +
           '<td style="max-width:120px;overflow:hidden;text-overflow:ellipsis" title="'+s.id+'">' + s.id.slice(0, 12) + '</td>' +
           '<td>' + (s.name || '-') + '</td>' +
@@ -424,10 +437,12 @@ function renderModal(detail) {
   html += metaItem('Agent', (AGENT_META[s.agent] || {}).name || s.agent);
   html += metaItem('Size', formatBytes(s.size || 0));
   html += metaItem('Messages', detail.messageCount != null ? detail.messageCount : '-');
-  html += metaItem('Input Tokens', formatTokens(tu.input));
-  html += metaItem('Output Tokens', formatTokens(tu.output));
-  if (tu.cacheRead != null) html += metaItem('Cache Read', formatTokens(tu.cacheRead));
-  if (tu.cacheCreate != null) html += metaItem('Cache Create', formatTokens(tu.cacheCreate));
+  html += metaItem('Input', formatTokens(tu.input));
+  if (tu.cacheRead) html += metaItem('Cache Hit', formatTokens(tu.cacheRead));
+  if (tu.cacheCreate) html += metaItem('Cache Create', formatTokens(tu.cacheCreate));
+  html += metaItem('Output', formatTokens(tu.output));
+  var modalTotal = (tu.input||0) + (tu.output||0) + (tu.cacheRead||0) + (tu.cacheCreate||0);
+  html += metaItem('Total', formatTokens(modalTotal));
   html += metaItem('Last Modified', formatRelativeTime(s.lastModified));
   html += '</div>';
 
