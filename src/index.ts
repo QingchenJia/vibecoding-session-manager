@@ -2,7 +2,8 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { ScannerRegistry } from './scanners/registry.js';
-import { displaySessionGroups, displayJson, displayStats, getAgentDisplayName } from './ui/display.js';
+import { displaySessionGroups, displayJson, getAgentDisplayName } from './ui/display.js';
+import { startServer } from './web/server.js';
 import { displayInspect } from './ui/inspect.js';
 import { interactiveDelete } from './ui/interactive.js';
 import { formatBytes } from './utils/formatters.js';
@@ -351,12 +352,13 @@ program
 // ─── stats ────────────────────────────────────────────────────────
 program
   .command('stats')
-  .description('Show disk usage summary for all agents')
-  .action(async () => {
+  .description('Launch web dashboard for session statistics')
+  .option('-p, --port <number>', 'Port number for the web server', parseInt)
+  .action(async (options) => {
     const registry = new ScannerRegistry();
     try {
       const groups = await registry.discoverAll();
-      displayStats(groups);
+      await startServer({ groups, port: options.port });
     } catch (err) {
       console.error(chalk.red(`Error: ${(err as Error).message}`));
       process.exit(1);
