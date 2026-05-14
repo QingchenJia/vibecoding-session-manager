@@ -6,12 +6,14 @@ const AGENT_COLORS: Record<AgentType, ChalkInstance> = {
   cc: chalk.hex('#CC7832'),
   copilot: chalk.hex('#00B8D4'),
   codex: chalk.hex('#10A37F'),
+  reasonix: chalk.hex('#7C5CFF'),
 };
 
 const AGENT_NAMES: Record<AgentType, string> = {
   cc: 'Claude Code',
   copilot: 'GitHub Copilot',
   codex: 'Codex (OpenAI)',
+  reasonix: 'Reasonix',
 };
 
 export function getAgentColor(agent: AgentType): ChalkInstance {

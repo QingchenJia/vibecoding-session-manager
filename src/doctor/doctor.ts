@@ -27,6 +27,7 @@ export class Doctor {
       await this.checkCC(),
       await this.checkCodex(),
       await this.checkCopilot(),
+      await this.checkReasonix(),
     ];
   }
 
@@ -283,6 +284,66 @@ export class Doctor {
     });
 
     return { agent: 'copilot', displayName: getAgentDisplayName('copilot'), checks, issues };
+  }
+
+  // ─── Reasonix ─────────────────────────────────────────────────────
+
+  private async checkReasonix(): Promise<AgentCheckResult> {
+    const issues: string[] = [];
+    const checks: CheckItem[] = [];
+    const reasonixDir = path.join(this.home, '.reasonix');
+
+    const reasonixExists = await this.dirExists(reasonixDir);
+    checks.push({
+      label: 'Config path',
+      status: reasonixExists ? 'ok' : 'info',
+      detail: reasonixExists ? reasonixDir : `${reasonixDir} (not found)`,
+    });
+
+    let sessionCount = 0;
+    for (const dirName of ['session-state', 'sessions', 'transcripts']) {
+      const dir = path.join(reasonixDir, dirName);
+      const files = await this.findFilesRecursive(dir, '.jsonl');
+      sessionCount += files.length;
+      for (const file of files) {
+        const stat = await fs.stat(file).catch(() => null);
+        if (stat && stat.size === 0) {
+          issues.push(`Empty Reasonix session file: ${path.relative(reasonixDir, file).replace(/\\/g, '/')}`);
+        }
+      }
+    }
+    checks.push({
+      label: 'Sessions',
+      status: sessionCount > 0 ? 'ok' : 'info',
+      detail: String(sessionCount),
+    });
+
+    const skillsDir = path.join(reasonixDir, 'skills');
+    const skillsExists = await this.dirExists(skillsDir);
+    let skillCount = 0;
+    if (skillsExists) {
+      try {
+        const entries = await fs.readdir(skillsDir, { withFileTypes: true });
+        skillCount = entries.filter((e) => {
+          if (e.name.startsWith('.')) return false;
+          return e.isDirectory() || (e.isFile() && e.name.endsWith('.md'));
+        }).length;
+      } catch { /* skip */ }
+    }
+    checks.push({
+      label: 'Skills path',
+      status: skillsExists ? 'ok' : 'warning',
+      detail: skillsExists ? `${skillsDir} (${skillCount} skills)` : `${skillsDir} (not found)`,
+    });
+
+    const canWrite = await this.canWrite(reasonixExists ? reasonixDir : this.home);
+    checks.push({
+      label: 'Permissions',
+      status: canWrite ? 'ok' : 'error',
+      detail: canWrite ? 'read/write' : 'read-only',
+    });
+
+    return { agent: 'reasonix', displayName: getAgentDisplayName('reasonix'), checks, issues };
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────

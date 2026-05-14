@@ -107,6 +107,10 @@ export async function readCopilotQuota(): Promise<QuotaInfo | undefined> {
   return undefined;
 }
 
+export async function readReasonixQuota(): Promise<QuotaInfo | undefined> {
+  return undefined;
+}
+
 function fetchCodexUsage(accessToken: string): Promise<Record<string, unknown> | undefined> {
   return new Promise((resolve) => {
     const req = https.request({

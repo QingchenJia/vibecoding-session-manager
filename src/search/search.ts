@@ -62,6 +62,7 @@ async function searchInSession(
   if (agent === 'cc') return searchCC(session, terms);
   if (agent === 'codex') return searchCodex(session, terms, platform);
   if (agent === 'copilot') return searchCopilot(session, terms);
+  if (agent === 'reasonix') return searchReasonix(session, terms);
   return [];
 }
 
@@ -169,4 +170,49 @@ async function searchCopilot(session: Session, terms: string[]): Promise<SearchM
     }
   } catch { /* skip */ }
   return matches;
+}
+
+async function searchReasonix(session: Session, terms: string[]): Promise<SearchMatch[]> {
+  const matches: SearchMatch[] = [];
+  try {
+    const content = await fs.readFile(session.path, 'utf-8');
+    const lines = content.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+      let entry: Record<string, unknown>;
+      try { entry = JSON.parse(line); } catch { continue; }
+      const role = getReasonixRole(entry);
+      const text = getReasonixText(entry);
+      if (role !== 'user' || !text) continue;
+      const lower = text.toLowerCase();
+      if (terms.every((t) => lower.includes(t))) {
+        const idx = Math.max(0, lower.indexOf(terms[0]) - 40);
+        const snippet = text.slice(idx, idx + 150);
+        matches.push({ line: i + 1, content: text, snippet });
+      }
+    }
+  } catch { /* skip */ }
+  return matches;
+}
+
+function getReasonixRole(entry: Record<string, unknown>): string | null {
+  const role = entry.role ?? (entry.message as Record<string, unknown> | undefined)?.role;
+  if (typeof role === 'string') return role;
+  if (entry.type === 'user' || entry.type === 'assistant') return entry.type;
+  return null;
+}
+
+function getReasonixText(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (!value || typeof value !== 'object') return '';
+  if (Array.isArray(value)) {
+    return value.map(getReasonixText).filter(Boolean).join(' ');
+  }
+  const obj = value as Record<string, unknown>;
+  for (const key of ['content', 'text', 'message', 'prompt', 'response']) {
+    const text = getReasonixText(obj[key]);
+    if (text) return text;
+  }
+  return '';
 }

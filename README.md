@@ -1,6 +1,6 @@
 # VibeCoding Session Manager
 
-A terminal tool to manage AI coding agent sessions and skills — list, delete sessions and manage cross-agent skills for **Claude Code**, **Codex (OpenAI)**, and **GitHub Copilot**.
+A terminal tool to manage AI coding agent sessions and skills — list, delete sessions and manage cross-agent skills for **Claude Code**, **Codex (OpenAI)**, **GitHub Copilot**, and **Reasonix**.
 
 ### Motivation
 
@@ -73,6 +73,7 @@ Completion is **prefix-based** — only shows results matching what you've alrea
 | `vibe d` | `delete`, `delete-id`, `doctor` |
 | `vibe list --` | `--agent`, `--json`, `--help` |
 | `vibe list -a c` | `cc`, `copilot`, `codex` |
+| `vibe list -a r` | `reasonix` |
 | `vibe skills r` | `register` |
 | `vibe inspect bd` | `bd378032-fef2-...` (session ID) |
 | `vibe completion b` | `bash` |
@@ -80,7 +81,7 @@ Completion is **prefix-based** — only shows results matching what you've alrea
 Completed items include:
 
 - **Command names** — top-level and subcommands (e.g., `skills register`)
-- **Agent names** — `cc`, `copilot`, `codex` for `-a`/`-t`/`-f` flags and positional args
+- **Agent names** — `cc`, `copilot`, `codex`, `reasonix` for `-a`/`-t`/`-f` flags and positional args
 - **Skill names** — dynamically discovered from your skill directories
 - **Session IDs** — prefix-matched from your actual sessions (cached for 30s)
 - **Flags** — command-specific options (`--json`, `--all`, `--dry-run`, etc.)
@@ -94,6 +95,7 @@ In all commands, agents are referenced by short names:
 | `cc` | Claude Code |
 | `codex` | Codex (OpenAI) |
 | `copilot` | GitHub Copilot |
+| `reasonix` | Reasonix |
 
 Run `vibe --help` to see this list at any time.
 
@@ -164,6 +166,7 @@ Quota data is cached for 30 seconds to avoid excessive API calls on repeated ref
 vibe inspect <session-id> -a cc       # Claude Code: full JSONL parse with preview
 vibe inspect <session-id> -a codex    # Codex: rollout + SQLite metadata
 vibe inspect <session-id> -a copilot  # Copilot: transcript summary and file paths
+vibe inspect <session-id> -a reasonix # Reasonix: events JSONL summary
 ```
 
 Displays project name, session ID, path, last activity, size, first/last user message, message count, token usage (input/output/cached/total), preview, and raw file list.
@@ -186,6 +189,8 @@ Displays project name, session ID, path, last activity, size, first/last user me
 - **Codex** — input and output tokens extracted from `token_count` events in rollout JSONL files (cumulative values, last event used). Cache hit/create not available from Codex data source, displayed as "-". Falls back to `tokens_used` in `state_5.sqlite` (plain total number) when rollout data is unavailable.
 
 - **Copilot** — output tokens extracted from `completionTokens` field in VS Code chatSessions JSONL. Input, cache hit, and cache create are not available from Copilot's data source, displayed as "-". Only chatSessions format contains token data; transcript format does not.
+
+- **Reasonix** — best-effort extraction from `usage`, `tokenUsage`, `tokens`, or `cost` objects in Reasonix events JSONL. Supports common prompt/completion/cache token field names.
 
 #### `vibe search` — Full-text search across session content
 
@@ -260,6 +265,7 @@ Checks whether `SKILL.md` content differs and whether any files exist in only on
 | **Claude Code** | `~/.claude/projects/<encoded>/*.jsonl` | `~/.claude/skills/` |
 | **Codex (OpenAI)** | `~/.codex/session_index.jsonl` + SQLite DBs | `~/.codex/skills/` (system skills in `.system/`) |
 | **GitHub Copilot** | `<appData>/Code/User/workspaceStorage/<hash>/` + transcripts | `~/.copilot/skills/` |
+| **Reasonix** | `~/.reasonix/session-state/`, `~/.reasonix/sessions/`, project `.reasonix/` JSONL events | `~/.reasonix/skills/` |
 
 Scanners gracefully return no results when an agent is not installed on the machine — no errors, just zero sessions.
 
@@ -270,6 +276,8 @@ Scanners gracefully return no results when an agent is not installed on the mach
 **Codex (OpenAI)** — Sessions indexed in `~/.codex/session_index.jsonl`. Actual data in shared SQLite databases (`logs_2.sqlite`, `state_5.sqlite`) and per-session rollout files under `~/.codex/sessions/`. Deleting removes index entry, SQLite records, and rollout files. Skills: `~/.codex/skills/<name>/SKILL.md`, with built-in skills under `.system/` subdirectory.
 
 **GitHub Copilot** — Sessions stored in VS Code workspace storage under `chatSessions/` and `GitHub.copilot-chat/transcripts/` directories. Duplicate sessions across these directories are automatically deduplicated by filename. Skills: `~/.copilot/skills/<name>/SKILL.md`. Note: Copilot may also discover skills from other agents' directories at runtime.
+
+**Reasonix** — Sessions are discovered from global `~/.reasonix/session-state/`, `~/.reasonix/sessions/`, `~/.reasonix/transcripts/`, and configured/current project `.reasonix/` JSONL files. Deleting an `events.jsonl` session removes its containing session directory; deleting a standalone JSONL session removes that file. Skills: `~/.reasonix/skills/<name>/SKILL.md`; existing flat `~/.reasonix/skills/<name>.md` files are also discovered.
 
 ### Project Structure
 
@@ -286,6 +294,7 @@ src/
 │   ├── claude-code-scanner.ts  # Claude Code session discovery and deletion
 │   ├── codex-scanner.ts        # Codex (OpenAI) session discovery and deletion
 │   ├── copilot-scanner.ts      # GitHub Copilot session discovery and deletion
+│   ├── reasonix-scanner.ts     # Reasonix session discovery and deletion
 │   └── registry.ts             # Scanner registry — orchestrates all agent scanners
 ├── skills/
 │   ├── skill-registry.ts       # Skill discovery, registration, deregistration, inspect, diff
@@ -330,4 +339,5 @@ The **ScannerRegistry** aggregates all scanners. CLI commands call the registry,
 npm run dev     # run with tsx (no compile step needed)
 npm run build   # compile TypeScript to dist/
 npm run check   # type-check only (no emit)
+npm test        # run Node test suite through tsx
 ```

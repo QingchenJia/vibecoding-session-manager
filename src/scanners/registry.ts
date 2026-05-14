@@ -2,6 +2,7 @@ import type { IScanner, Session, SessionGroup, AgentType } from '../types.js';
 import { ClaudeCodeScanner } from './claude-code-scanner.js';
 import { CopilotScanner } from './copilot-scanner.js';
 import { CodexScanner } from './codex-scanner.js';
+import { ReasonixScanner } from './reasonix-scanner.js';
 
 export class ScannerRegistry {
   private scanners: Map<AgentType, IScanner> = new Map();
@@ -10,6 +11,7 @@ export class ScannerRegistry {
     this.register(new ClaudeCodeScanner());
     this.register(new CodexScanner());
     this.register(new CopilotScanner());
+    this.register(new ReasonixScanner());
   }
 
   register(scanner: IScanner): void {

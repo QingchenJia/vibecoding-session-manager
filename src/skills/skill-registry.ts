@@ -30,6 +30,7 @@ export class SkillRegistry {
     this.addAgent('cc', path.join(home, '.claude', 'skills'), null);
     this.addAgent('codex', path.join(home, '.codex', 'skills'), '.system');
     this.addAgent('copilot', path.join(home, '.copilot', 'skills'), null);
+    this.addAgent('reasonix', path.join(home, '.reasonix', 'skills'), null);
   }
 
   private addAgent(agent: AgentType, skillsDir: string, builtinSubdir: string | null): void {
@@ -52,8 +53,8 @@ export class SkillRegistry {
       try {
         const all = await fs.readdir(config.skillsDir, { withFileTypes: true });
         entries = all
-          .filter((d) => d.isDirectory())
-          .map((d) => d.name)
+          .filter((d) => d.isDirectory() || (d.isFile() && d.name.endsWith('.md')))
+          .map((d) => d.isDirectory() ? d.name : d.name.replace(/\.md$/, ''))
           .filter((name) => {
             if (name.startsWith('.')) return false;
             if (config.builtinSubdir && name === config.builtinSubdir) return false;
@@ -69,9 +70,9 @@ export class SkillRegistry {
         skillMap.set(entry, registered);
 
         if (!descMap.has(entry)) {
-          const mdPath = path.join(config.skillsDir, entry, 'SKILL.md');
+          const mdPath = await this.getSkillMarkdownPath(config.skillsDir, entry);
           try {
-            const content = await fs.readFile(mdPath, 'utf-8');
+            const content = mdPath ? await fs.readFile(mdPath, 'utf-8') : '';
             const fm = parseFrontmatter(content);
             descMap.set(entry, fm?.description || '');
           } catch {
@@ -106,15 +107,12 @@ export class SkillRegistry {
 
     for (const agent of this.agents) {
       const config = this.configs.get(agent)!;
-      const skillDir = path.join(config.skillsDir, skillName);
-      try {
-        await fs.access(skillDir);
+      const skillPath = await this.getSkillPath(config.skillsDir, skillName);
+      if (skillPath) {
         agents.push(agent);
         if (!sourcePath) {
-          sourcePath = skillDir;
+          sourcePath = skillPath;
         }
-      } catch {
-        // agent doesn't have this skill
       }
     }
 
@@ -150,10 +148,8 @@ export class SkillRegistry {
       if (!srcConfig) {
         return { success: false, message: `Unknown source agent: ${fromAgent}` };
       }
-      sourcePath = path.join(srcConfig.skillsDir, skillName);
-      try {
-        await fs.access(sourcePath);
-      } catch {
+      sourcePath = await this.getSkillPath(srcConfig.skillsDir, skillName);
+      if (!sourcePath) {
         return {
           success: false,
           message: `Skill "${skillName}" not found in ${fromAgent}`,
@@ -176,7 +172,7 @@ export class SkillRegistry {
 
     // Recursive copy
     try {
-      await this.copyDir(sourcePath, destPath);
+      await this.copySkill(sourcePath, destPath);
       return { success: true, message: `Registered "${skillName}" to ${toAgent}` };
     } catch (err) {
       return {
@@ -195,10 +191,8 @@ export class SkillRegistry {
       return { success: false, message: `Unknown agent: ${fromAgent}` };
     }
 
-    const skillPath = path.join(config.skillsDir, skillName);
-    try {
-      await fs.access(skillPath);
-    } catch {
+    const skillPath = await this.getSkillPath(config.skillsDir, skillName);
+    if (!skillPath) {
       return { success: false, message: `Skill "${skillName}" is not registered in ${fromAgent}` };
     }
 
@@ -224,16 +218,15 @@ export class SkillRegistry {
 
     for (const agent of this.agents) {
       const config = this.configs.get(agent)!;
-      const skillDir = path.join(config.skillsDir, skillName);
-      try {
-        await fs.access(skillDir);
+      const skillPath = await this.getSkillPath(config.skillsDir, skillName);
+      if (skillPath) {
         registeredIn.push(agent);
-        paths[agent] = skillDir;
+        paths[agent] = skillPath;
 
         // Read SKILL.md for description
-        const mdPath = path.join(skillDir, 'SKILL.md');
+        const mdPath = await this.getSkillMarkdownPath(config.skillsDir, skillName);
         try {
-          const content = await fs.readFile(mdPath, 'utf-8');
+          const content = mdPath ? await fs.readFile(mdPath, 'utf-8') : '';
           const fm = content.match(/^---\s*\n([\s\S]*?)\n---/);
           if (fm) {
             const desc = fm[1].match(/^description:\s*(.+)$/m)?.[1]?.trim();
@@ -243,9 +236,14 @@ export class SkillRegistry {
 
         // List files
         const fileList: string[] = [];
-        await this.listFiles(skillDir, skillDir, fileList);
+        const stat = await fs.stat(skillPath);
+        if (stat.isDirectory()) {
+          await this.listFiles(skillPath, skillPath, fileList);
+        } else {
+          fileList.push(path.basename(skillPath));
+        }
         files[agent] = fileList;
-      } catch {
+      } else {
         // not registered in this agent
       }
     }
@@ -268,16 +266,16 @@ export class SkillRegistry {
   }> {
     const configA = this.configs.get(agentA)!;
     const configB = this.configs.get(agentB)!;
-    const dirA = path.join(configA.skillsDir, skillName);
-    const dirB = path.join(configB.skillsDir, skillName);
+    const pathA = await this.getSkillPath(configA.skillsDir, skillName);
+    const pathB = await this.getSkillPath(configB.skillsDir, skillName);
 
     const diffLines: string[] = [];
     const onlyInA: string[] = [];
     const onlyInB: string[] = [];
 
     // Compare SKILL.md
-    const mdA = await this.readFileSafe(path.join(dirA, 'SKILL.md'));
-    const mdB = await this.readFileSafe(path.join(dirB, 'SKILL.md'));
+    const mdA = pathA ? await this.readSkillMarkdown(pathA) : null;
+    const mdB = pathB ? await this.readSkillMarkdown(pathB) : null;
 
     if (mdA === null && mdB === null) {
       diffLines.push('SKILL.md missing in both agents');
@@ -292,8 +290,8 @@ export class SkillRegistry {
     // Compare files
     const filesA = new Set<string>();
     const filesB = new Set<string>();
-    await this.listFiles(dirA, dirA, []).then((f) => f.forEach((x) => filesA.add(x))).catch(() => {});
-    await this.listFiles(dirB, dirB, []).then((f) => f.forEach((x) => filesB.add(x))).catch(() => {});
+    await this.listSkillFiles(pathA).then((f) => f.forEach((x) => filesA.add(x))).catch(() => {});
+    await this.listSkillFiles(pathB).then((f) => f.forEach((x) => filesB.add(x))).catch(() => {});
 
     for (const f of filesA) {
       if (!filesB.has(f)) onlyInA.push(f);
@@ -313,6 +311,44 @@ export class SkillRegistry {
     try { return await fs.readFile(filePath, 'utf-8'); } catch { return null; }
   }
 
+  private async getSkillPath(skillsDir: string, skillName: string): Promise<string | null> {
+    const dirPath = path.join(skillsDir, skillName);
+    try {
+      if ((await fs.stat(dirPath)).isDirectory()) return dirPath;
+    } catch { /* skip */ }
+
+    const filePath = path.join(skillsDir, `${skillName}.md`);
+    try {
+      if ((await fs.stat(filePath)).isFile()) return filePath;
+    } catch { /* skip */ }
+    return null;
+  }
+
+  private async getSkillMarkdownPath(skillsDir: string, skillName: string): Promise<string | null> {
+    const skillPath = await this.getSkillPath(skillsDir, skillName);
+    if (!skillPath) return null;
+    const stat = await fs.stat(skillPath);
+    return stat.isDirectory() ? path.join(skillPath, 'SKILL.md') : skillPath;
+  }
+
+  private async readSkillMarkdown(skillPath: string): Promise<string | null> {
+    try {
+      const stat = await fs.stat(skillPath);
+      return stat.isDirectory()
+        ? this.readFileSafe(path.join(skillPath, 'SKILL.md'))
+        : this.readFileSafe(skillPath);
+    } catch {
+      return null;
+    }
+  }
+
+  private async listSkillFiles(skillPath: string | null): Promise<string[]> {
+    if (!skillPath) return [];
+    const stat = await fs.stat(skillPath);
+    if (!stat.isDirectory()) return [path.basename(skillPath)];
+    return this.listFiles(skillPath, skillPath, []);
+  }
+
   private async listFiles(baseDir: string, dir: string, result: string[]): Promise<string[]> {
     try {
       const entries = await fs.readdir(dir, { withFileTypes: true });
@@ -326,6 +362,16 @@ export class SkillRegistry {
       }
     } catch { /* skip */ }
     return result;
+  }
+
+  private async copySkill(src: string, dest: string): Promise<void> {
+    const stat = await fs.stat(src);
+    if (stat.isFile()) {
+      await fs.mkdir(dest, { recursive: true });
+      await fs.copyFile(src, path.join(dest, 'SKILL.md'));
+      return;
+    }
+    await this.copyDir(src, dest);
   }
 
   private async copyDir(src: string, dest: string): Promise<void> {
