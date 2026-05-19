@@ -28,6 +28,8 @@ export class Doctor {
       await this.checkCodex(),
       await this.checkCopilot(),
       await this.checkReasonix(),
+      await this.checkOpenCode(),
+      await this.checkGemini(),
     ];
   }
 
@@ -99,7 +101,7 @@ export class Doctor {
       detail: canWrite ? 'read/write' : 'read-only',
     });
 
-    return { agent: 'cc', displayName: getAgentDisplayName('cc'), checks, issues };
+    return { agent: 'claude', displayName: getAgentDisplayName('claude'), checks, issues };
   }
 
   // ─── Codex ────────────────────────────────────────────────────────
@@ -348,6 +350,112 @@ export class Doctor {
 
   // ─── Helpers ──────────────────────────────────────────────────────
 
+  private async checkOpenCode(): Promise<AgentCheckResult> {
+    const issues: string[] = [];
+    const checks: CheckItem[] = [];
+    const dataDir = process.env.OPENCODE_DATA_DIR || path.join(this.home, '.local', 'share', 'opencode');
+
+    const dataExists = await this.dirExists(dataDir);
+    checks.push({
+      label: 'Data path',
+      status: dataExists ? 'ok' : 'info',
+      detail: dataExists ? dataDir : `${dataDir} (not found)`,
+    });
+
+    let sessionCount = 0;
+    const dbPath = path.join(dataDir, 'opencode.db');
+    if (await this.fileExists(dbPath)) {
+      try {
+        const db = new Database(dbPath, { readonly: true, fileMustExist: true });
+        const row = db.prepare('SELECT count(*) as count FROM session').get() as { count: number };
+        sessionCount += row.count;
+        db.close();
+        checks.push({ label: 'SQLite DB', status: 'ok', detail: `${dbPath} (${row.count} sessions)` });
+      } catch {
+        checks.push({ label: 'SQLite DB', status: 'error', detail: `${dbPath} (cannot open)` });
+        issues.push('Cannot open OpenCode SQLite database');
+      }
+    } else {
+      checks.push({ label: 'SQLite DB', status: 'info', detail: `${dbPath} (not found)` });
+    }
+
+    const projectDir = path.join(dataDir, 'project');
+    const jsonSessions = await this.findFilesRecursive(projectDir, '.json');
+    const storageSessions = jsonSessions.filter((file) => file.replace(/\\/g, '/').includes('/storage/session/'));
+    sessionCount += storageSessions.length;
+    checks.push({
+      label: 'Storage sessions',
+      status: storageSessions.length > 0 ? 'ok' : 'info',
+      detail: `${projectDir} (${storageSessions.length} JSON sessions)`,
+    });
+    checks.push({ label: 'Sessions', status: sessionCount > 0 ? 'ok' : 'info', detail: String(sessionCount) });
+
+    const skillsDir = path.join(this.home, '.config', 'opencode', 'skills');
+    const skillsExists = await this.dirExists(skillsDir);
+    checks.push({
+      label: 'Skills path',
+      status: skillsExists ? 'ok' : 'warning',
+      detail: skillsExists ? `${skillsDir} (${await this.countSkillDirs(skillsDir)} skills)` : `${skillsDir} (not found)`,
+    });
+
+    const canWrite = await this.canWrite(dataExists ? dataDir : this.home);
+    checks.push({
+      label: 'Permissions',
+      status: canWrite ? 'ok' : 'error',
+      detail: canWrite ? 'read/write' : 'read-only',
+    });
+
+    return { agent: 'opencode', displayName: getAgentDisplayName('opencode'), checks, issues };
+  }
+
+  private async checkGemini(): Promise<AgentCheckResult> {
+    const issues: string[] = [];
+    const checks: CheckItem[] = [];
+    const geminiDir = path.join(this.home, '.gemini');
+    const tmpDir = path.join(geminiDir, 'tmp');
+
+    const geminiExists = await this.dirExists(geminiDir);
+    checks.push({
+      label: 'Config path',
+      status: geminiExists ? 'ok' : 'info',
+      detail: geminiExists ? geminiDir : `${geminiDir} (not found)`,
+    });
+
+    const files = await this.findFilesRecursive(tmpDir, '.json');
+    const sessionFiles = files.filter((file) => {
+      const normalized = file.replace(/\\/g, '/');
+      return path.basename(file) !== 'logs.json' && (normalized.includes('/chats/') || normalized.includes('/checkpoint'));
+    });
+    for (const file of sessionFiles) {
+      const stat = await fs.stat(file).catch(() => null);
+      if (stat && stat.size === 0) {
+        issues.push(`Empty Gemini session file: ${path.relative(geminiDir, file).replace(/\\/g, '/')}`);
+      }
+    }
+    checks.push({
+      label: 'Sessions',
+      status: sessionFiles.length > 0 ? 'ok' : 'info',
+      detail: `${tmpDir} (${sessionFiles.length} JSON sessions)`,
+    });
+
+    const skillsDir = path.join(geminiDir, 'skills');
+    const skillsExists = await this.dirExists(skillsDir);
+    checks.push({
+      label: 'Skills path',
+      status: skillsExists ? 'ok' : 'warning',
+      detail: skillsExists ? `${skillsDir} (${await this.countSkillDirs(skillsDir)} skills)` : `${skillsDir} (not found)`,
+    });
+
+    const canWrite = await this.canWrite(geminiExists ? geminiDir : this.home);
+    checks.push({
+      label: 'Permissions',
+      status: canWrite ? 'ok' : 'error',
+      detail: canWrite ? 'read/write' : 'read-only',
+    });
+
+    return { agent: 'gemini', displayName: getAgentDisplayName('gemini'), checks, issues };
+  }
+
   private get copilotWorkspaceDir(): string | null {
     if (this.platform.isWindows && this.platform.appData) {
       return path.join(this.platform.appData, 'Code', 'User', 'workspaceStorage');
@@ -377,6 +485,13 @@ export class Doctor {
     try {
       const files = await fs.readdir(dir);
       return files.filter((f) => f.endsWith('.jsonl') || f.endsWith('.json')).length;
+    } catch { return 0; }
+  }
+
+  private async countSkillDirs(dir: string): Promise<number> {
+    try {
+      const entries = await fs.readdir(dir, { withFileTypes: true });
+      return entries.filter((entry) => entry.isDirectory() && !entry.name.startsWith('.')).length;
     } catch { return 0; }
   }
 

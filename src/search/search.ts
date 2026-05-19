@@ -59,10 +59,12 @@ async function searchInSession(
   terms: string[],
   platform: ReturnType<typeof detectPlatform>,
 ): Promise<SearchMatch[]> {
-  if (agent === 'cc') return searchCC(session, terms);
+  if (agent === 'claude') return searchCC(session, terms);
   if (agent === 'codex') return searchCodex(session, terms, platform);
   if (agent === 'copilot') return searchCopilot(session, terms);
   if (agent === 'reasonix') return searchReasonix(session, terms);
+  if (agent === 'opencode') return searchOpenCode(session, terms);
+  if (agent === 'gemini') return searchGemini(session, terms);
   return [];
 }
 
@@ -196,10 +198,89 @@ async function searchReasonix(session: Session, terms: string[]): Promise<Search
   return matches;
 }
 
+async function searchOpenCode(session: Session, terms: string[]): Promise<SearchMatch[]> {
+  if (session.path.endsWith('.db')) return searchOpenCodeDb(session, terms);
+  return searchGenericJsonSession(session.path, terms);
+}
+
+async function searchOpenCodeDb(session: Session, terms: string[]): Promise<SearchMatch[]> {
+  const matches: SearchMatch[] = [];
+  try {
+    const db = new Database(session.path, { readonly: true, fileMustExist: true });
+    const messageRoles = new Map<string, string>();
+    let line = 0;
+
+    if (sqliteTableExists(db, 'message')) {
+      const rows = db.prepare('SELECT * FROM message WHERE session_id = ? ORDER BY time_created, id').all(session.id) as Record<string, unknown>[];
+      for (const row of rows) {
+        line++;
+        const data = parseJson(row.data);
+        const role = getGenericRole(data as Record<string, unknown>) || getGenericRole(row);
+        const id = typeof row.id === 'string' ? row.id : '';
+        if (id && role) messageRoles.set(id, role);
+        const text = getReasonixText(data);
+        if (role === 'user' && textMatches(text, terms)) {
+          matches.push({ line, content: text, snippet: snippetFor(text, terms) });
+        }
+      }
+    }
+
+    if (matches.length === 0 && sqliteTableExists(db, 'part')) {
+      const rows = db.prepare('SELECT * FROM part WHERE session_id = ? ORDER BY time_created, id').all(session.id) as Record<string, unknown>[];
+      for (const row of rows) {
+        line++;
+        const data = parseJson(row.data);
+        const messageId = typeof row.message_id === 'string' ? row.message_id : '';
+        const role = getGenericRole(data as Record<string, unknown>) || messageRoles.get(messageId);
+        const text = getReasonixText(data);
+        if (role === 'user' && textMatches(text, terms)) {
+          matches.push({ line, content: text, snippet: snippetFor(text, terms) });
+        }
+      }
+    }
+
+    db.close();
+  } catch { /* skip */ }
+  return matches;
+}
+
+async function searchGemini(session: Session, terms: string[]): Promise<SearchMatch[]> {
+  return searchGenericJsonSession(session.path, terms);
+}
+
+async function searchGenericJsonSession(filePath: string, terms: string[]): Promise<SearchMatch[]> {
+  const matches: SearchMatch[] = [];
+  try {
+    const data = JSON.parse(await fs.readFile(filePath, 'utf-8'));
+    const arrays = findMessageArrays(unwrapJson(data));
+    let line = 0;
+    for (const arr of arrays) {
+      for (const item of arr) {
+        line++;
+        const role = getGenericRole(item as Record<string, unknown>);
+        const text = getReasonixText(item);
+        if (role === 'user' && textMatches(text, terms)) {
+          matches.push({ line, content: text, snippet: snippetFor(text, terms) });
+        }
+      }
+      if (matches.length > 0) break;
+    }
+  } catch { /* skip */ }
+  return matches;
+}
+
 function getReasonixRole(entry: Record<string, unknown>): string | null {
   const role = entry.role ?? (entry.message as Record<string, unknown> | undefined)?.role;
   if (typeof role === 'string') return role;
   if (entry.type === 'user' || entry.type === 'assistant') return entry.type;
+  return null;
+}
+
+function getGenericRole(entry: Record<string, unknown> | null | undefined): string | null {
+  if (!entry || typeof entry !== 'object') return null;
+  const role = entry.role ?? (entry.message as Record<string, unknown> | undefined)?.role ?? entry.type;
+  if (role === 'user') return 'user';
+  if (role === 'assistant' || role === 'model') return 'assistant';
   return null;
 }
 
@@ -215,4 +296,42 @@ function getReasonixText(value: unknown): string {
     if (text) return text;
   }
   return '';
+}
+
+function unwrapJson(value: unknown): unknown {
+  if (!value || typeof value !== 'object') return value;
+  const obj = value as Record<string, unknown>;
+  return obj.data ?? obj.session ?? obj.chat ?? value;
+}
+
+function findMessageArrays(data: unknown): unknown[][] {
+  if (Array.isArray(data)) return [data];
+  if (!data || typeof data !== 'object') return [];
+  const obj = data as Record<string, unknown>;
+  const arrays: unknown[][] = [];
+  for (const key of ['history', 'messages', 'conversation', 'turns', 'records', 'parts']) {
+    if (Array.isArray(obj[key])) arrays.push(obj[key] as unknown[]);
+  }
+  return arrays;
+}
+
+function parseJson(value: unknown): unknown {
+  if (typeof value !== 'string') return value;
+  try { return JSON.parse(value); } catch { return value; }
+}
+
+function sqliteTableExists(db: Database.Database, table: string): boolean {
+  const row = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?").get(table);
+  return Boolean(row);
+}
+
+function textMatches(text: string, terms: string[]): boolean {
+  const lower = text.toLowerCase();
+  return terms.every((term) => lower.includes(term));
+}
+
+function snippetFor(text: string, terms: string[]): string {
+  const lower = text.toLowerCase();
+  const idx = Math.max(0, lower.indexOf(terms[0]) - 40);
+  return text.slice(idx, idx + 150);
 }

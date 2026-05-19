@@ -1,7 +1,7 @@
 import { SkillRegistry } from './skills/skill-registry.js';
 import { ScannerRegistry } from './scanners/registry.js';
 
-const VALID_AGENTS = ['cc', 'copilot', 'codex', 'reasonix'];
+const VALID_AGENTS = ['claude', 'copilot', 'codex', 'reasonix', 'opencode', 'gemini'];
 
 // ── Shell script generators ─────────────────────────────────────────
 

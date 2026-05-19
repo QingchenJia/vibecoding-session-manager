@@ -1,6 +1,6 @@
 # VibeCoding Session Manager
 
-A terminal tool to manage AI coding agent sessions and skills — list, delete sessions and manage cross-agent skills for **Claude Code**, **Codex (OpenAI)**, **GitHub Copilot**, and **Reasonix**.
+A terminal tool to manage AI coding agent sessions and skills — list, delete sessions and manage cross-agent skills for **Claude Code**, **Codex (OpenAI)**, **GitHub Copilot**, **Reasonix**, **OpenCode**, and **Gemini CLI**.
 
 ### Motivation
 
@@ -72,7 +72,9 @@ Completion is **prefix-based** — only shows results matching what you've alrea
 | `vibe l` | `list` |
 | `vibe d` | `delete`, `delete-id`, `doctor` |
 | `vibe list --` | `--agent`, `--json`, `--help` |
-| `vibe list -a c` | `cc`, `copilot`, `codex` |
+| `vibe list -a c` | `claude`, `copilot`, `codex` |
+| `vibe list -a g` | `gemini` |
+| `vibe list -a o` | `opencode` |
 | `vibe list -a r` | `reasonix` |
 | `vibe skills r` | `register` |
 | `vibe inspect bd` | `bd378032-fef2-...` (session ID) |
@@ -81,7 +83,7 @@ Completion is **prefix-based** — only shows results matching what you've alrea
 Completed items include:
 
 - **Command names** — top-level and subcommands (e.g., `skills register`)
-- **Agent names** — `cc`, `copilot`, `codex`, `reasonix` for `-a`/`-t`/`-f` flags and positional args
+- **Agent names** — `claude`, `copilot`, `codex`, `reasonix`, `opencode`, `gemini` for `-a`/`-t`/`-f` flags and positional args
 - **Skill names** — dynamically discovered from your skill directories
 - **Session IDs** — prefix-matched from your actual sessions (cached for 30s)
 - **Flags** — command-specific options (`--json`, `--all`, `--dry-run`, etc.)
@@ -92,10 +94,12 @@ In all commands, agents are referenced by short names:
 
 | Name | Agent |
 |------|-------|
-| `cc` | Claude Code |
+| `claude` | Claude Code |
 | `codex` | Codex (OpenAI) |
 | `copilot` | GitHub Copilot |
 | `reasonix` | Reasonix |
+| `opencode` | OpenCode |
+| `gemini` | Gemini CLI |
 
 Run `vibe --help` to see this list at any time.
 
@@ -105,8 +109,10 @@ Run `vibe --help` to see this list at any time.
 
 ```bash
 vibe list                    # show all agents
-vibe list --agent cc         # filter by specific agent
+vibe list --agent claude     # filter by specific agent
 vibe list --agent codex      # only Codex sessions
+vibe list --agent opencode   # only OpenCode sessions
+vibe list --agent gemini     # only Gemini CLI sessions
 vibe list --json             # machine-readable JSON output
 ```
 
@@ -130,7 +136,7 @@ vibe delete --all                  # delete ALL sessions from ALL agents (double
 #### `vibe delete-id` — Delete a specific session by its ID
 
 ```bash
-vibe delete-id <session-id> -a cc
+vibe delete-id <session-id> -a claude
 ```
 
 #### `vibe prune` — Delete sessions older than N days
@@ -156,17 +162,19 @@ Launches a local web server and opens a browser dashboard showing:
 - **Token usage** — click an agent card to load token breakdown (input, cache hit, cache create, output) for each session, with sortable columns
 - **Session detail** — click a session row to view full detail (messages, token usage, preview)
 
-The dashboard uses a dark theme with agent brand colors (Claude Code orange, Copilot cyan, Codex green) and supports responsive layout.
+The dashboard uses a dark theme with agent brand colors (Claude Code orange, Copilot cyan, Codex green, Reasonix purple, OpenCode orange, Gemini blue) and supports responsive layout.
 
 Quota data is cached for 30 seconds to avoid excessive API calls on repeated refreshes. If an API call fails after the cache expires, the last successful data is preserved and displayed until the next successful fetch. Press `Ctrl+C` in the terminal to stop the server.
 
 #### `vibe inspect` — Show detailed session information
 
 ```bash
-vibe inspect <session-id> -a cc       # Claude Code: full JSONL parse with preview
+vibe inspect <session-id> -a claude   # Claude Code: full JSONL parse with preview
 vibe inspect <session-id> -a codex    # Codex: rollout + SQLite metadata
 vibe inspect <session-id> -a copilot  # Copilot: transcript summary and file paths
 vibe inspect <session-id> -a reasonix # Reasonix: events JSONL summary
+vibe inspect <session-id> -a opencode # OpenCode: SQLite/JSON storage summary
+vibe inspect <session-id> -a gemini   # Gemini CLI: JSON chat/checkpoint summary
 ```
 
 Displays project name, session ID, path, last activity, size, first/last user message, message count, token usage (input/output/cached/total), preview, and raw file list.
@@ -192,12 +200,18 @@ Displays project name, session ID, path, last activity, size, first/last user me
 
 - **Reasonix** — best-effort extraction from `usage`, `tokenUsage`, `tokens`, or `cost` objects in Reasonix events JSONL. Supports common prompt/completion/cache token field names.
 
+- **OpenCode** — extracted from `tokens_input`, `tokens_output`, `tokens_cache_read`, and `tokens_cache_write` columns in OpenCode SQLite session rows when available. JSON storage fallback uses best-effort token field extraction.
+
+- **Gemini CLI** — best-effort extraction from `usage`, `tokenUsage`, `token_usage`, or `metadata` objects in Gemini JSON chat/checkpoint files. Supports common prompt/completion/total token field names.
+
 #### `vibe search` — Full-text search across session content
 
 ```bash
 vibe search "docker compose"              # search all agents
-vibe search "RAG" --agent cc              # only Claude Code
+vibe search "RAG" --agent claude          # only Claude Code
 vibe search "PostgreSQL" --agent codex    # only Codex
+vibe search "refactor" --agent opencode   # only OpenCode
+vibe search "tests" --agent gemini        # only Gemini CLI
 vibe search "API" --since 30              # only last 30 days
 vibe search "error" --limit 5             # limit to 5 sessions
 ```
@@ -231,7 +245,7 @@ Copies a skill from any agent that has it to a target agent's skill directory.
 
 ```bash
 vibe skills register karpathy-guidelines --to copilot           # auto-discovers source
-vibe skills register karpathy-guidelines --to copilot --from cc # explicit source
+vibe skills register karpathy-guidelines --to copilot --from claude # explicit source
 ```
 
 #### `vibe skills deregister` — Remove a skill from an agent
@@ -239,7 +253,7 @@ vibe skills register karpathy-guidelines --to copilot --from cc # explicit sourc
 Deletes the skill directory from the specified agent.
 
 ```bash
-vibe skills deregister karpathy-guidelines --from cc
+vibe skills deregister karpathy-guidelines --from claude
 ```
 
 #### `vibe skills inspect` — Show detailed skill information
@@ -253,7 +267,7 @@ Displays skill name, description, which agents have it registered with full path
 #### `vibe skills diff` — Compare a skill between two agents
 
 ```bash
-vibe skills diff karpathy-guidelines cc codex
+vibe skills diff karpathy-guidelines claude codex
 ```
 
 Checks whether `SKILL.md` content differs and whether any files exist in only one agent. Reports differences clearly.
@@ -266,6 +280,8 @@ Checks whether `SKILL.md` content differs and whether any files exist in only on
 | **Codex (OpenAI)** | `~/.codex/session_index.jsonl` + SQLite DBs | `~/.codex/skills/` (system skills in `.system/`) |
 | **GitHub Copilot** | `<appData>/Code/User/workspaceStorage/<hash>/` + transcripts | `~/.copilot/skills/` |
 | **Reasonix** | `~/.reasonix/session-state/`, `~/.reasonix/sessions/`, project `.reasonix/` JSONL events | `~/.reasonix/skills/` |
+| **OpenCode** | `~/.local/share/opencode/opencode.db`, `opencode-*.db`, and `project/*/storage/session/` JSON files | `~/.config/opencode/skills/` |
+| **Gemini CLI** | `~/.gemini/tmp/<project_hash>/chats/*.json` and saved/checkpoint JSON files | `~/.gemini/skills/` |
 
 Scanners gracefully return no results when an agent is not installed on the machine — no errors, just zero sessions.
 
@@ -278,6 +294,10 @@ Scanners gracefully return no results when an agent is not installed on the mach
 **GitHub Copilot** — Sessions stored in VS Code workspace storage under `chatSessions/` and `GitHub.copilot-chat/transcripts/` directories. Duplicate sessions across these directories are automatically deduplicated by filename. Skills: `~/.copilot/skills/<name>/SKILL.md`. Note: Copilot may also discover skills from other agents' directories at runtime.
 
 **Reasonix** — Sessions are discovered from global `~/.reasonix/session-state/`, `~/.reasonix/sessions/`, `~/.reasonix/transcripts/`, and configured/current project `.reasonix/` JSONL files. Deleting an `events.jsonl` session removes its containing session directory; deleting a standalone JSONL session removes that file. Skills: `~/.reasonix/skills/<name>/SKILL.md`; existing flat `~/.reasonix/skills/<name>.md` files are also discovered.
+
+**OpenCode** — Sessions are discovered from the default data directory `~/.local/share/opencode/`, or `OPENCODE_DATA_DIR` when set. SQLite sessions are read from `opencode.db` and channel-specific `opencode-*.db` files; legacy/project JSON storage under `project/*/storage/session/` is also discovered. Deleting a SQLite session removes session/message/part/todo rows for that session; deleting a JSON session removes the session file. Skills: `~/.config/opencode/skills/<name>/SKILL.md`.
+
+**Gemini CLI** — Sessions are discovered from project-scoped JSON files under `~/.gemini/tmp/<project_hash>/chats/` plus saved/checkpoint JSON files in the same temp tree. Deleting a Gemini session removes the JSON session/checkpoint file. Skills: `~/.gemini/skills/<name>/SKILL.md`.
 
 ### Project Structure
 
@@ -295,6 +315,8 @@ src/
 │   ├── codex-scanner.ts        # Codex (OpenAI) session discovery and deletion
 │   ├── copilot-scanner.ts      # GitHub Copilot session discovery and deletion
 │   ├── reasonix-scanner.ts     # Reasonix session discovery and deletion
+│   ├── opencode-scanner.ts     # OpenCode session discovery and deletion
+│   ├── gemini-scanner.ts       # Gemini CLI session discovery and deletion
 │   └── registry.ts             # Scanner registry — orchestrates all agent scanners
 ├── skills/
 │   ├── skill-registry.ts       # Skill discovery, registration, deregistration, inspect, diff

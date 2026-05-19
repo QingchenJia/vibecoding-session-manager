@@ -3,6 +3,8 @@ import { ClaudeCodeScanner } from './claude-code-scanner.js';
 import { CopilotScanner } from './copilot-scanner.js';
 import { CodexScanner } from './codex-scanner.js';
 import { ReasonixScanner } from './reasonix-scanner.js';
+import { OpenCodeScanner } from './opencode-scanner.js';
+import { GeminiScanner } from './gemini-scanner.js';
 
 export class ScannerRegistry {
   private scanners: Map<AgentType, IScanner> = new Map();
@@ -12,6 +14,8 @@ export class ScannerRegistry {
     this.register(new CodexScanner());
     this.register(new CopilotScanner());
     this.register(new ReasonixScanner());
+    this.register(new OpenCodeScanner());
+    this.register(new GeminiScanner());
   }
 
   register(scanner: IScanner): void {

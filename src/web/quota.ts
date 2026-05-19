@@ -13,7 +13,7 @@ export async function readClaudeQuota(): Promise<QuotaInfo | undefined> {
     const stats = JSON.parse(content);
 
     const quota: QuotaInfo = {
-      agent: 'cc',
+      agent: 'claude',
       planType: 'Claude Code',
     };
 
@@ -108,6 +108,14 @@ export async function readCopilotQuota(): Promise<QuotaInfo | undefined> {
 }
 
 export async function readReasonixQuota(): Promise<QuotaInfo | undefined> {
+  return undefined;
+}
+
+export async function readOpenCodeQuota(): Promise<QuotaInfo | undefined> {
+  return undefined;
+}
+
+export async function readGeminiQuota(): Promise<QuotaInfo | undefined> {
   return undefined;
 }
 

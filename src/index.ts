@@ -18,7 +18,7 @@ import path from 'node:path';
 import { generateCompletionScript, handleComplete } from './completion.js';
 import type { AgentType, SessionGroup, SkillInfo } from './types.js';
 
-const VALID_AGENTS: AgentType[] = ['cc', 'copilot', 'codex', 'reasonix'];
+const VALID_AGENTS: AgentType[] = ['claude', 'copilot', 'codex', 'reasonix', 'opencode', 'gemini'];
 
 function parseAgent(value: string): AgentType {
   if (!VALID_AGENTS.includes(value as AgentType)) {

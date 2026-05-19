@@ -190,10 +190,12 @@ tr.session-row:hover{background:rgba(255,255,255,0.05)}
 
 <script>
 const AGENT_META = {
-  cc:      { name: 'Claude Code',       color: '#CC7832', initial: 'C' },
+  claude:  { name: 'Claude Code',       color: '#CC7832', initial: 'C' },
   copilot: { name: 'GitHub Copilot',    color: '#00B8D4', initial: 'G' },
   codex:   { name: 'Codex (OpenAI)',    color: '#10A37F', initial: 'X' },
   reasonix:{ name: 'Reasonix',          color: '#7C5CFF', initial: 'R' },
+  opencode:{ name: 'OpenCode',          color: '#F97316', initial: 'O' },
+  gemini:  { name: 'Gemini CLI',        color: '#4285F4', initial: 'G' },
 };
 
 let currentAgent = null;

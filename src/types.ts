@@ -1,4 +1,4 @@
-export type AgentType = 'cc' | 'copilot' | 'codex' | 'reasonix';
+export type AgentType = 'claude' | 'copilot' | 'codex' | 'reasonix' | 'opencode' | 'gemini';
 
 export interface Session {
   id: string;

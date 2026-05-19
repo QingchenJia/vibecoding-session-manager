@@ -1,7 +1,7 @@
 {
   "name": "vibecoding-session-manager",
   "version": "0.1.0",
-  "description": "Terminal tool to manage AI coding agent sessions and skills across Claude Code, Codex (OpenAI), and GitHub Copilot.",
+  "description": "Terminal tool to manage AI coding agent sessions and skills across Claude Code, Codex, Copilot, Reasonix, OpenCode, and Gemini CLI.",
   "type": "module",
   "license": "MIT",
   "author": "QingchenJia",
@@ -18,6 +18,9 @@
     "claude-code",
     "codex",
     "copilot",
+    "reasonix",
+    "opencode",
+    "gemini-cli",
     "disk-cleanup",
     "terminal"
   ],

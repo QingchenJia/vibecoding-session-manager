@@ -3,17 +3,21 @@ import type { SessionGroup, AgentType } from '../types.js';
 import { formatRelativeTime, formatBytes, truncate } from '../utils/formatters.js';
 
 const AGENT_COLORS: Record<AgentType, ChalkInstance> = {
-  cc: chalk.hex('#CC7832'),
+  claude: chalk.hex('#CC7832'),
   copilot: chalk.hex('#00B8D4'),
   codex: chalk.hex('#10A37F'),
   reasonix: chalk.hex('#7C5CFF'),
+  opencode: chalk.hex('#F97316'),
+  gemini: chalk.hex('#4285F4'),
 };
 
 const AGENT_NAMES: Record<AgentType, string> = {
-  cc: 'Claude Code',
+  claude: 'Claude Code',
   copilot: 'GitHub Copilot',
   codex: 'Codex (OpenAI)',
   reasonix: 'Reasonix',
+  opencode: 'OpenCode',
+  gemini: 'Gemini CLI',
 };
 
 export function getAgentColor(agent: AgentType): ChalkInstance {

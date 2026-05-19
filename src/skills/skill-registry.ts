@@ -27,10 +27,12 @@ export class SkillRegistry {
     const platform = detectPlatform();
     const home = platform.homeDir;
 
-    this.addAgent('cc', path.join(home, '.claude', 'skills'), null);
+    this.addAgent('claude', path.join(home, '.claude', 'skills'), null);
     this.addAgent('codex', path.join(home, '.codex', 'skills'), '.system');
     this.addAgent('copilot', path.join(home, '.copilot', 'skills'), null);
     this.addAgent('reasonix', path.join(home, '.reasonix', 'skills'), null);
+    this.addAgent('opencode', path.join(home, '.config', 'opencode', 'skills'), null);
+    this.addAgent('gemini', path.join(home, '.gemini', 'skills'), null);
   }
 
   private addAgent(agent: AgentType, skillsDir: string, builtinSubdir: string | null): void {

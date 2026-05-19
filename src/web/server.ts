@@ -2,7 +2,14 @@ import http from 'node:http';
 import { exec } from 'node:child_process';
 import type { AgentType, SessionGroup, SessionTokenData } from '../types.js';
 import { ScannerRegistry } from '../scanners/registry.js';
-import { readClaudeQuota, readCodexQuota, readCopilotQuota, readReasonixQuota } from './quota.js';
+import {
+  readClaudeQuota,
+  readCodexQuota,
+  readCopilotQuota,
+  readReasonixQuota,
+  readOpenCodeQuota,
+  readGeminiQuota,
+} from './quota.js';
 import { getDashboardHtml } from './html.js';
 
 const QUOTA_CACHE_TTL = 30_000; // 30 seconds
@@ -23,10 +30,12 @@ export async function startServer(options: {
       return cached.data;
     }
     const quotaFns: Record<AgentType, () => Promise<import('../types.js').QuotaInfo | undefined>> = {
-      cc: readClaudeQuota,
+      claude: readClaudeQuota,
       codex: readCodexQuota,
       copilot: readCopilotQuota,
       reasonix: readReasonixQuota,
+      opencode: readOpenCodeQuota,
+      gemini: readGeminiQuota,
     };
     const data = await quotaFns[agent]();
     if (data || !cached) {
@@ -74,7 +83,7 @@ export async function startServer(options: {
         return;
       }
 
-      const tokenMatch = url.pathname.match(/^\/api\/tokens\/(cc|copilot|codex|reasonix)$/);
+      const tokenMatch = url.pathname.match(/^\/api\/tokens\/(claude|copilot|codex|reasonix|opencode|gemini)$/);
       if (tokenMatch) {
         const agent = tokenMatch[1] as AgentType;
         const sessions = await registry.discoverByAgent(agent);
@@ -104,7 +113,7 @@ export async function startServer(options: {
         return;
       }
 
-      const sessionMatch = url.pathname.match(/^\/api\/session\/(cc|copilot|codex|reasonix)\/(.+)$/);
+      const sessionMatch = url.pathname.match(/^\/api\/session\/(claude|copilot|codex|reasonix|opencode|gemini)\/(.+)$/);
       if (sessionMatch) {
         const agent = sessionMatch[1] as AgentType;
         const id = decodeURIComponent(sessionMatch[2]);
