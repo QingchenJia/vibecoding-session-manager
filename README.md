@@ -130,7 +130,7 @@ Two-stage interactive flow:
 vibe delete                        # interactive multi-select across all agents
 vibe delete --agent copilot        # filter to Copilot first, then interactive
 vibe delete --all --agent codex    # delete ALL Codex sessions at once (with confirmation)
-vibe delete --all                  # delete ALL sessions from ALL agents (double-confirms)
+vibe delete --all                  # delete ALL sessions from ALL agents (with confirmation)
 ```
 
 #### `vibe delete-id` — Delete a specific session by its ID
