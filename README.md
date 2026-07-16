@@ -1,12 +1,14 @@
 # VibeCoding Session Manager
 
-A terminal tool to manage AI coding agent sessions and skills — list, delete sessions and manage cross-agent skills for **Claude Code**, **Codex (OpenAI)**, **GitHub Copilot**, **Reasonix**, **OpenCode**, and **Gemini CLI**.
+**简体中文** | [English](README.en.md)
 
-### Motivation
+一款用于管理 AI 编程代理会话与技能的终端工具——可统一列出、删除会话，并在 **Claude Code**、**Codex (OpenAI)**、**GitHub Copilot**、**Reasonix**、**OpenCode** 和 **Gemini CLI** 之间管理技能。
 
-AI coding agents accumulate session files and skills on disk over time. Sessions — conversation transcripts, context data, and logs — can grow to hundreds of megabytes and are never cleaned up automatically. Skills are stored in agent-specific directories and must be manually copied between agents. This tool gives you a unified interface to manage both.
+### 为什么需要它
 
-### Installation
+AI 编程代理会不断在磁盘上积累会话文件与技能。会话中包含对话记录、上下文数据和日志，长期使用后可能占用数百 MB 空间，而且通常不会自动清理。技能则分散在不同代理各自的目录中，需要手动复制。此工具为这两类数据提供了统一的管理界面。
+
+### 安装
 
 ```bash
 git clone https://github.com/QingchenJia/vibecoding-session-manager.git
@@ -14,20 +16,21 @@ cd vibecoding-session-manager
 npm install -g .
 ```
 
-`npm install -g .` installs the package globally from the current directory. It automatically:
-1. Runs `tsc` (via the `prepare` script) to compile TypeScript
-2. Creates `vibe` / `vibe.cmd` wrappers in the global npm bin directory (which is already in your `PATH`)
-3. No manual environment variable configuration needed
+`npm install -g .` 会从当前目录全局安装该软件包，并自动完成以下操作：
 
-After installation, the `vibe` command works from any terminal, any directory.
+1. 通过 `prepare` 脚本运行 `tsc`，编译 TypeScript
+2. 在 npm 全局可执行文件目录（通常已加入 `PATH`）中创建 `vibe` / `vibe.cmd` 启动脚本
+3. 无需手动配置环境变量
 
-**Requirements:** Node.js >= 18
+安装完成后，可在任意终端、任意目录中使用 `vibe` 命令。
 
-### Shell Completion
+**环境要求：** Node.js >= 18
 
-Tab completion for commands, agents, options, skill names, and session IDs.
+### Shell 命令补全
 
-Generate the completion script for your shell:
+支持对命令、代理、选项、技能名称及会话 ID 进行 Tab 补全。
+
+为当前 Shell 生成补全脚本：
 
 ```bash
 vibe completion bash        # Bash
@@ -36,13 +39,13 @@ vibe completion fish        # Fish
 vibe completion powershell  # PowerShell
 ```
 
-Or auto-detect and install in one step:
+也可以自动检测 Shell 并一步完成安装：
 
 ```bash
 vibe completion install
 ```
 
-#### Manual Installation
+#### 手动安装
 
 ```bash
 # Bash
@@ -51,7 +54,7 @@ source ~/.local/share/bash-completion/completions/vibe
 
 # Zsh
 vibe completion zsh > ~/.zfunc/_vibe
-# Ensure ~/.zfunc is in your fpath (add to ~/.zshrc):
+# 确保 ~/.zfunc 位于 fpath 中（可添加到 ~/.zshrc）：
 #   fpath=(~/.zfunc $fpath)
 
 # Fish
@@ -61,39 +64,39 @@ vibe completion fish > ~/.config/fish/completions/vibe.fish
 vibe completion powershell >> $PROFILE
 ```
 
-Restart your shell or source the file to activate.
+重启 Shell 或重新加载对应配置文件即可启用补全。
 
-#### What Gets Completed
+#### 可补全的内容
 
-Completion is **prefix-based** — only shows results matching what you've already typed.
+补全采用**前缀匹配**，只显示与已输入内容匹配的结果。
 
-| Input | Tab Result |
-|-------|-----------|
+| 输入 | Tab 补全结果 |
+|------|-------------|
 | `vibe l` | `list` |
-| `vibe d` | `delete`, `delete-id`, `doctor` |
-| `vibe list --` | `--agent`, `--json`, `--help` |
-| `vibe list -a c` | `claude`, `copilot`, `codex` |
+| `vibe d` | `delete`、`delete-id`、`doctor` |
+| `vibe list --` | `--agent`、`--json`、`--help` |
+| `vibe list -a c` | `claude`、`copilot`、`codex` |
 | `vibe list -a g` | `gemini` |
 | `vibe list -a o` | `opencode` |
 | `vibe list -a r` | `reasonix` |
 | `vibe skills r` | `register` |
-| `vibe inspect bd` | `bd378032-fef2-...` (session ID) |
+| `vibe inspect bd` | `bd378032-fef2-...`（会话 ID） |
 | `vibe completion b` | `bash` |
 
-Completed items include:
+补全范围包括：
 
-- **Command names** — top-level and subcommands (e.g., `skills register`)
-- **Agent names** — `claude`, `copilot`, `codex`, `reasonix`, `opencode`, `gemini` for `-a`/`-t`/`-f` flags and positional args
-- **Skill names** — dynamically discovered from your skill directories
-- **Session IDs** — prefix-matched from your actual sessions (cached for 30s)
-- **Flags** — command-specific options (`--json`, `--all`, `--dry-run`, etc.)
+- **命令名称**——顶层命令和子命令（如 `skills register`）
+- **代理名称**——为 `-a` / `-t` / `-f` 参数及位置参数补全 `claude`、`copilot`、`codex`、`reasonix`、`opencode`、`gemini`
+- **技能名称**——从本机技能目录动态发现
+- **会话 ID**——根据实际会话进行前缀匹配（缓存 30 秒）
+- **参数选项**——各命令专属选项，如 `--json`、`--all`、`--dry-run` 等
 
-### Agent Names
+### 代理名称
 
-In all commands, agents are referenced by short names:
+所有命令均使用以下短名称引用代理：
 
-| Name | Agent |
-|------|-------|
+| 名称 | 代理 |
+|------|------|
 | `claude` | Claude Code |
 | `codex` | Codex (OpenAI) |
 | `copilot` | GitHub Copilot |
@@ -101,245 +104,247 @@ In all commands, agents are referenced by short names:
 | `opencode` | OpenCode |
 | `gemini` | Gemini CLI |
 
-Run `vibe --help` to see this list at any time.
+随时运行 `vibe --help` 即可查看此列表。
 
-### Session Commands
+### 会话命令
 
-#### `vibe list` — List all sessions grouped by agent
-
-```bash
-vibe list                    # show all agents
-vibe list --agent claude     # filter by specific agent
-vibe list --agent codex      # only Codex sessions
-vibe list --agent opencode   # only OpenCode sessions
-vibe list --agent gemini     # only Gemini CLI sessions
-vibe list --json             # machine-readable JSON output
-```
-
-Output shows session ID (first 8 chars), project name, last activity time, and file size per session, grouped and color-coded by agent.
-
-#### `vibe delete` — Interactive session deletion
-
-Two-stage interactive flow:
-1. **Choose an agent** from the list (or "All agents")
-2. **Multi-select sessions** with checkboxes (space to toggle, type to filter, enter to confirm)
-3. **Confirm** — shows count and total size to be freed
-4. **Execute** with per-session progress feedback
+#### `vibe list`——按代理分组列出全部会话
 
 ```bash
-vibe delete                        # interactive multi-select across all agents
-vibe delete --agent copilot        # filter to Copilot first, then interactive
-vibe delete --all --agent codex    # delete ALL Codex sessions at once (with confirmation)
-vibe delete --all                  # delete ALL sessions from ALL agents (with confirmation)
+vibe list                    # 显示所有代理
+vibe list --agent claude     # 按指定代理筛选
+vibe list --agent codex      # 仅显示 Codex 会话
+vibe list --agent opencode   # 仅显示 OpenCode 会话
+vibe list --agent gemini     # 仅显示 Gemini CLI 会话
+vibe list --json             # 输出机器可读的 JSON
 ```
 
-#### `vibe delete-id` — Delete a specific session by its ID
+输出会按代理分组并使用不同颜色，显示每个会话的 ID（前 8 个字符）、项目名称、最后活动时间及文件大小。
+
+#### `vibe delete`——交互式删除会话
+
+交互流程：
+
+1. 从列表中**选择代理**（或选择“所有代理”）
+2. 使用复选框**多选会话**（空格切换、输入文字筛选、回车确认）
+3. **确认操作**——显示待删除数量及预计释放的总空间
+4. **执行删除**——逐个显示会话处理进度
+
+```bash
+vibe delete                        # 在所有代理中交互式多选
+vibe delete --agent copilot        # 先筛选 Copilot，再交互选择
+vibe delete --all --agent codex    # 删除全部 Codex 会话（需确认）
+vibe delete --all                  # 删除全部代理的全部会话（需确认）
+```
+
+#### `vibe delete-id`——按 ID 删除指定会话
 
 ```bash
 vibe delete-id <session-id> -a claude
 ```
 
-#### `vibe prune` — Delete sessions older than N days
+#### `vibe prune`——删除早于指定天数的会话
 
 ```bash
-vibe prune -d 30                   # delete sessions untouched for 30+ days
-vibe prune -d 30 --agent copilot   # only prune Copilot sessions
-vibe prune -d 30 --dry-run         # preview: show what would be deleted, no action
+vibe prune -d 30                   # 删除 30 天及更久未活动的会话
+vibe prune -d 30 --agent copilot   # 仅清理 Copilot 会话
+vibe prune -d 30 --dry-run         # 仅预览，不执行删除
 ```
 
-#### `vibe stats` — Web dashboard for session statistics
+#### `vibe stats`——会话统计 Web 仪表盘
 
 ```bash
-vibe stats                # launch dashboard (random port)
-vibe stats --port 3000    # specify port
+vibe stats                # 使用随机端口启动仪表盘
+vibe stats --port 3000    # 指定端口
 ```
 
-Launches a local web server and opens a browser dashboard showing:
+该命令会启动本地 Web 服务器并打开浏览器仪表盘，其中包括：
 
-- **Overview cards** — per-agent session count and storage size
-- **Account info** — plan type, subscription period (detected from local auth files)
-- **Quota tracking** — for Codex (ChatGPT Plus), shows real-time remaining quota for 5-hour and 1-week windows as progress bars (fetched from `chatgpt.com/backend-api/codex/usage`)
-- **Token usage** — click an agent card to load token breakdown (input, cache hit, cache create, output) for each session, with sortable columns
-- **Session detail** — click a session row to view full detail (messages, token usage, preview)
+- **概览卡片**——每个代理的会话数量和存储占用
+- **账户信息**——从本地认证文件检测套餐类型与订阅周期
+- **配额跟踪**——针对 Codex（ChatGPT Plus）实时显示 5 小时和 1 周窗口的剩余配额进度条（数据来自 `chatgpt.com/backend-api/codex/usage`）
+- **Token 用量**——点击代理卡片可加载各会话的输入、缓存命中、缓存创建及输出 Token，并支持表格排序
+- **会话详情**——点击会话行可查看消息、Token 用量和预览等完整信息
 
-The dashboard uses a dark theme with agent brand colors (Claude Code orange, Copilot cyan, Codex green, Reasonix purple, OpenCode orange, Gemini blue) and supports responsive layout.
+仪表盘采用深色主题和各代理的品牌色（Claude Code 橙色、Copilot 青色、Codex 绿色、Reasonix 紫色、OpenCode 橙色、Gemini 蓝色），并支持响应式布局。
 
-Quota data is cached for 30 seconds to avoid excessive API calls on repeated refreshes. If an API call fails after the cache expires, the last successful data is preserved and displayed until the next successful fetch. Press `Ctrl+C` in the terminal to stop the server.
+配额数据会缓存 30 秒，避免重复刷新触发过多 API 请求。缓存过期后若 API 调用失败，将保留并显示最近一次成功获取的数据，直至下次请求成功。在终端中按 `Ctrl+C` 可停止服务器。
 
-#### `vibe inspect` — Show detailed session information
+#### `vibe inspect`——查看会话详情
 
 ```bash
-vibe inspect <session-id> -a claude   # Claude Code: full JSONL parse with preview
-vibe inspect <session-id> -a codex    # Codex: rollout + SQLite metadata
-vibe inspect <session-id> -a copilot  # Copilot: transcript summary and file paths
-vibe inspect <session-id> -a reasonix # Reasonix: events JSONL summary
-vibe inspect <session-id> -a opencode # OpenCode: SQLite/JSON storage summary
-vibe inspect <session-id> -a gemini   # Gemini CLI: JSON chat/checkpoint summary
+vibe inspect <session-id> -a claude   # Claude Code：完整解析 JSONL 并预览
+vibe inspect <session-id> -a codex    # Codex：rollout 与 SQLite 元数据
+vibe inspect <session-id> -a copilot  # Copilot：记录摘要及文件路径
+vibe inspect <session-id> -a reasonix # Reasonix：events JSONL 摘要
+vibe inspect <session-id> -a opencode # OpenCode：SQLite/JSON 存储摘要
+vibe inspect <session-id> -a gemini   # Gemini CLI：JSON 对话/检查点摘要
 ```
 
-Displays project name, session ID, path, last activity, size, first/last user message, message count, token usage (input/output/cached/total), preview, and raw file list.
+该命令显示项目名称、会话 ID、路径、最后活动时间、大小、首条/末条用户消息、消息数量、Token 用量（输入/输出/缓存/总计）、预览及原始文件列表。
 
-**Token usage** is displayed when the agent provides usage data:
+代理提供用量数据时，还会显示 **Token 用量**：
 
-- **Claude Code** — extracted from `message.usage` in assistant entries of the JSONL session file. Consecutive entries with identical `(input_tokens, output_tokens, cache_read_input_tokens)` values are deduplicated — each group represents a single API call, while subsequent entries are streaming chunks or tool-call iterations that share the same usage data.
+- **Claude Code**——从 JSONL 会话文件中 assistant 条目的 `message.usage` 提取。连续条目如果具有相同的 `(input_tokens, output_tokens, cache_read_input_tokens)`，会被去重；每一组代表一次 API 调用，后续重复条目通常是共享相同用量数据的流式分块或工具调用迭代。
 
-  **Fields displayed (all agents, unified format):**
-  - `Input` — input tokens (not served from cache)
-  - `Cache Hit` — tokens served from prompt cache (`cache_read_input_tokens`)
-  - `Cache Create` — tokens used to create prompt cache (`cache_creation_input_tokens`)
-  - `Output` — output tokens
-  - `Total` — sum of all above
+  **统一显示字段（适用于所有代理）：**
 
-  Fields unavailable from an agent's data source are displayed as "-".
+  - `Input`——未由缓存提供的输入 Token
+  - `Cache Hit`——来自提示词缓存的 Token（`cache_read_input_tokens`）
+  - `Cache Create`——用于创建提示词缓存的 Token（`cache_creation_input_tokens`）
+  - `Output`——输出 Token
+  - `Total`——上述所有字段之和
 
-  **Note:** Session files are project-scoped rolling logs, accumulating data across multiple CLI sessions. Token totals reflect all conversations within the file, not just the most recent one.
+  如果某代理的数据源不提供某个字段，该字段将显示为“-”。
 
-- **Codex** — input and output tokens extracted from `token_count` events in rollout JSONL files (cumulative values, last event used). Cache hit/create not available from Codex data source, displayed as "-". Falls back to `tokens_used` in `state_5.sqlite` (plain total number) when rollout data is unavailable.
+  **注意：** 会话文件是项目级滚动日志，会累积多次 CLI 会话的数据。Token 总数表示该文件中所有对话的总量，而不仅是最近一次对话。
 
-- **Copilot** — output tokens extracted from `completionTokens` field in VS Code chatSessions JSONL. Input, cache hit, and cache create are not available from Copilot's data source, displayed as "-". Only chatSessions format contains token data; transcript format does not.
+- **Codex**——从 rollout JSONL 文件的 `token_count` 事件提取输入及输出 Token（使用最后一条累计值）。Codex 数据源不提供缓存命中/创建数据，因此显示为“-”。如果 rollout 数据不可用，则回退到 `state_5.sqlite` 中的 `tokens_used`（仅总数）。
 
-- **Reasonix** — best-effort extraction from `usage`, `tokenUsage`, `tokens`, or `cost` objects in Reasonix events JSONL. Supports common prompt/completion/cache token field names.
+- **Copilot**——从 VS Code chatSessions JSONL 的 `completionTokens` 字段提取输出 Token。数据源不提供输入、缓存命中及缓存创建数据，因此显示为“-”。仅 chatSessions 格式包含 Token 数据，transcript 格式不包含。
 
-- **OpenCode** — extracted from `tokens_input`, `tokens_output`, `tokens_cache_read`, and `tokens_cache_write` columns in OpenCode SQLite session rows when available. JSON storage fallback uses best-effort token field extraction.
+- **Reasonix**——尽力从 Reasonix events JSONL 中的 `usage`、`tokenUsage`、`tokens` 或 `cost` 对象提取，并兼容常见的提示词、补全和缓存 Token 字段名称。
 
-- **Gemini CLI** — best-effort extraction from `usage`, `tokenUsage`, `token_usage`, or `metadata` objects in Gemini JSON chat/checkpoint files. Supports common prompt/completion/total token field names.
+- **OpenCode**——如果存在对应列，则从 OpenCode SQLite 会话行的 `tokens_input`、`tokens_output`、`tokens_cache_read` 和 `tokens_cache_write` 提取。使用 JSON 存储回退方案时，会尽力匹配 Token 字段。
 
-#### `vibe search` — Full-text search across session content
+- **Gemini CLI**——尽力从 Gemini JSON 对话/检查点文件的 `usage`、`tokenUsage`、`token_usage` 或 `metadata` 对象提取，并兼容常见的提示词、补全及总 Token 字段名称。
+
+#### `vibe search`——全文搜索会话内容
 
 ```bash
-vibe search "docker compose"              # search all agents
-vibe search "RAG" --agent claude          # only Claude Code
-vibe search "PostgreSQL" --agent codex    # only Codex
-vibe search "refactor" --agent opencode   # only OpenCode
-vibe search "tests" --agent gemini        # only Gemini CLI
-vibe search "API" --since 30              # only last 30 days
-vibe search "error" --limit 5             # limit to 5 sessions
+vibe search "docker compose"              # 搜索所有代理
+vibe search "RAG" --agent claude          # 仅搜索 Claude Code
+vibe search "PostgreSQL" --agent codex    # 仅搜索 Codex
+vibe search "refactor" --agent opencode   # 仅搜索 OpenCode
+vibe search "tests" --agent gemini        # 仅搜索 Gemini CLI
+vibe search "API" --since 30              # 仅搜索最近 30 天
+vibe search "error" --limit 5             # 最多显示 5 个会话
 ```
 
-Searches user messages across agent session files with plain text matching (multi-keyword AND). Shows matched session with highlighted snippet. `--agent`, `--since`, `--limit` filters supported.
+该命令会以纯文本方式在各代理的会话文件中搜索用户消息（多个关键词采用 AND 匹配），显示匹配会话及高亮摘要，并支持 `--agent`、`--since`、`--limit` 筛选。
 
-#### `vibe doctor` — Health check across all agents
+#### `vibe doctor`——检查所有代理的健康状态
 
 ```bash
 vibe doctor
 ```
 
-Checks each agent's session paths, skill directories, file permissions, and detects anomalies: empty session files, invalid JSONL lines, orphan rollout files with no matching SQLite thread, corrupt indices. Outputs a per-agent status summary with issues flagged.
+检查各代理的会话路径、技能目录和文件权限，并检测空会话文件、无效 JSONL 行、没有对应 SQLite thread 的孤立 rollout 文件及损坏索引等异常。输出按代理汇总，并标记发现的问题。
 
-### Skill Commands
+### 技能命令
 
-Skills are personal extensions installed in agent-specific directories. Different agents store skills in different locations, and a skill installed for one agent is not automatically available to others. `vibe skills` provides a unified view and cross-agent registration.
+技能是安装在代理专属目录中的个人扩展。在某一代理中安装的技能不会自动出现在其他代理中。`vibe skills` 提供统一视图及跨代理注册功能。
 
-#### `vibe skills` — Overview of all personal skills
-
-```bash
-vibe skills           # table showing each skill with per-agent registration status
-vibe skills --json    # machine-readable JSON output
-```
-
-Agent built-in skills (e.g., Codex system skills) are excluded. Only user-installed personal skills are shown.
-
-#### `vibe skills register` — Register a skill to another agent
-
-Copies a skill from any agent that has it to a target agent's skill directory.
+#### `vibe skills`——查看全部个人技能
 
 ```bash
-vibe skills register karpathy-guidelines --to copilot           # auto-discovers source
-vibe skills register karpathy-guidelines --to copilot --from claude # explicit source
+vibe skills           # 以表格显示各技能在每个代理中的注册状态
+vibe skills --json    # 输出机器可读的 JSON
 ```
 
-#### `vibe skills deregister` — Remove a skill from an agent
+代理的内置技能（如 Codex 系统技能）会被排除，只显示用户安装的个人技能。
 
-Deletes the skill directory from the specified agent.
+#### `vibe skills register`——将技能注册到另一个代理
+
+从已经安装该技能的任意代理，将其复制到目标代理的技能目录。
+
+```bash
+vibe skills register karpathy-guidelines --to copilot               # 自动发现来源
+vibe skills register karpathy-guidelines --to copilot --from claude # 明确指定来源
+```
+
+#### `vibe skills deregister`——从代理中移除技能
+
+删除指定代理中的技能目录。
 
 ```bash
 vibe skills deregister karpathy-guidelines --from claude
 ```
 
-#### `vibe skills inspect` — Show detailed skill information
+#### `vibe skills inspect`——查看技能详情
 
 ```bash
 vibe skills inspect karpathy-guidelines
 ```
 
-Displays skill name, description, which agents have it registered with full paths, and a file listing per agent.
+显示技能名称、描述、已注册该技能的代理及完整路径，以及每个代理中的文件列表。
 
-#### `vibe skills diff` — Compare a skill between two agents
+#### `vibe skills diff`——比较两个代理中的技能
 
 ```bash
 vibe skills diff karpathy-guidelines claude codex
 ```
 
-Checks whether `SKILL.md` content differs and whether any files exist in only one agent. Reports differences clearly.
+检查两边的 `SKILL.md` 内容是否不同，以及是否存在仅出现在其中一边的文件，并清晰展示差异。
 
-### Supported Agents
+### 支持的代理
 
-| Agent | Sessions | Skills |
-|-------|----------|--------|
+| 代理 | 会话 | 技能 |
+|------|------|------|
 | **Claude Code** | `~/.claude/projects/<encoded>/*.jsonl` | `~/.claude/skills/` |
-| **Codex (OpenAI)** | `~/.codex/session_index.jsonl` + SQLite DBs | `~/.codex/skills/` (system skills in `.system/`) |
+| **Codex (OpenAI)** | `~/.codex/session_index.jsonl` + SQLite 数据库 | `~/.codex/skills/`（系统技能位于 `.system/`） |
 | **GitHub Copilot** | `<appData>/Code/User/workspaceStorage/<hash>/` + transcripts | `~/.copilot/skills/` |
-| **Reasonix** | `~/.reasonix/session-state/`, `~/.reasonix/sessions/`, project `.reasonix/` JSONL events | `~/.reasonix/skills/` |
-| **OpenCode** | `~/.local/share/opencode/opencode.db`, `opencode-*.db`, and `project/*/storage/session/` JSON files | `~/.config/opencode/skills/` |
-| **Gemini CLI** | `~/.gemini/tmp/<project_hash>/chats/*.json` and saved/checkpoint JSON files | `~/.gemini/skills/` |
+| **Reasonix** | `~/.reasonix/session-state/`、`~/.reasonix/sessions/`、项目内 `.reasonix/` JSONL events | `~/.reasonix/skills/` |
+| **OpenCode** | `~/.local/share/opencode/opencode.db`、`opencode-*.db` 及 `project/*/storage/session/` JSON 文件 | `~/.config/opencode/skills/` |
+| **Gemini CLI** | `~/.gemini/tmp/<project_hash>/chats/*.json` 及保存的/检查点 JSON 文件 | `~/.gemini/skills/` |
 
-Scanners gracefully return no results when an agent is not installed on the machine — no errors, just zero sessions.
+如果机器上未安装某个代理，其扫描器会直接返回空结果，不会报错。
 
-#### Agent-Specific Notes
+#### 各代理说明
 
-**Claude Code** — Sessions: each project has encoded directory names (e.g., `D--Code-my-project`) under `~/.claude/projects/`. Deleting a session removes the `.jsonl` file and its associated subdirectory. Skills: `~/.claude/skills/<name>/SKILL.md`.
+**Claude Code**——会话：每个项目在 `~/.claude/projects/` 下对应一个编码后的目录名（如 `D--Code-my-project`）。删除会话时会移除 `.jsonl` 文件及其关联子目录。技能：`~/.claude/skills/<name>/SKILL.md`。
 
-**Codex (OpenAI)** — Sessions indexed in `~/.codex/session_index.jsonl`. Actual data in shared SQLite databases (`logs_2.sqlite`, `state_5.sqlite`) and per-session rollout files under `~/.codex/sessions/`. Deleting removes index entry, SQLite records, and rollout files. Skills: `~/.codex/skills/<name>/SKILL.md`, with built-in skills under `.system/` subdirectory.
+**Codex (OpenAI)**——会话索引位于 `~/.codex/session_index.jsonl`。实际数据存储在共享 SQLite 数据库（`logs_2.sqlite`、`state_5.sqlite`）以及 `~/.codex/sessions/` 下每个会话的 rollout 文件中。删除时会同时移除索引条目、SQLite 记录和 rollout 文件。技能：`~/.codex/skills/<name>/SKILL.md`，内置技能位于 `.system/` 子目录。
 
-**GitHub Copilot** — Sessions stored in VS Code workspace storage under `chatSessions/` and `GitHub.copilot-chat/transcripts/` directories. Duplicate sessions across these directories are automatically deduplicated by filename. Skills: `~/.copilot/skills/<name>/SKILL.md`. Note: Copilot may also discover skills from other agents' directories at runtime.
+**GitHub Copilot**——会话存储在 VS Code workspace storage 下的 `chatSessions/` 和 `GitHub.copilot-chat/transcripts/` 目录中。这些目录里文件名相同的重复会话会自动去重。技能：`~/.copilot/skills/<name>/SKILL.md`。注意：Copilot 在运行时也可能发现其他代理目录中的技能。
 
-**Reasonix** — Sessions are discovered from global `~/.reasonix/session-state/`, `~/.reasonix/sessions/`, `~/.reasonix/transcripts/`, and configured/current project `.reasonix/` JSONL files. Deleting an `events.jsonl` session removes its containing session directory; deleting a standalone JSONL session removes that file. Skills: `~/.reasonix/skills/<name>/SKILL.md`; existing flat `~/.reasonix/skills/<name>.md` files are also discovered.
+**Reasonix**——从全局 `~/.reasonix/session-state/`、`~/.reasonix/sessions/`、`~/.reasonix/transcripts/`，以及已配置项目/当前项目的 `.reasonix/` JSONL 文件中发现会话。删除 `events.jsonl` 会话时会移除其所在的会话目录；删除独立 JSONL 会话时则只移除该文件。技能：`~/.reasonix/skills/<name>/SKILL.md`；也能发现已有的扁平文件 `~/.reasonix/skills/<name>.md`。
 
-**OpenCode** — Sessions are discovered from the default data directory `~/.local/share/opencode/`, or `OPENCODE_DATA_DIR` when set. SQLite sessions are read from `opencode.db` and channel-specific `opencode-*.db` files; legacy/project JSON storage under `project/*/storage/session/` is also discovered. Deleting a SQLite session removes session/message/part/todo rows for that session; deleting a JSON session removes the session file. Skills: `~/.config/opencode/skills/<name>/SKILL.md`.
+**OpenCode**——从默认数据目录 `~/.local/share/opencode/`（设置 `OPENCODE_DATA_DIR` 时使用该目录）发现会话。SQLite 会话来自 `opencode.db` 和各通道的 `opencode-*.db` 文件，也会发现 `project/*/storage/session/` 下的旧版/项目 JSON 存储。删除 SQLite 会话时，会移除该会话对应的 session、message、part 和 todo 行；删除 JSON 会话时则移除会话文件。技能：`~/.config/opencode/skills/<name>/SKILL.md`。
 
-**Gemini CLI** — Sessions are discovered from project-scoped JSON files under `~/.gemini/tmp/<project_hash>/chats/` plus saved/checkpoint JSON files in the same temp tree. Deleting a Gemini session removes the JSON session/checkpoint file. Skills: `~/.gemini/skills/<name>/SKILL.md`.
+**Gemini CLI**——从 `~/.gemini/tmp/<project_hash>/chats/` 下按项目存储的 JSON 文件，以及同一临时目录树中的已保存/检查点 JSON 文件发现会话。删除 Gemini 会话时会移除相应的 JSON 会话/检查点文件。技能：`~/.gemini/skills/<name>/SKILL.md`。
 
-### Project Structure
+### 项目结构
 
-```
+```text
 src/
-├── index.ts                    # CLI entry point (commander)
-├── types.ts                    # Shared TypeScript interfaces and types
-├── completion.ts               # Shell completion scripts and handler
+├── index.ts                    # CLI 入口（commander）
+├── types.ts                    # 共享 TypeScript 接口及类型
+├── completion.ts               # Shell 补全脚本及处理程序
 ├── utils/
-│   ├── platform.ts             # Cross-platform detection (Windows/macOS/Linux)
-│   └── formatters.ts           # Time formatting, byte formatting, path decoding
+│   ├── platform.ts             # 跨平台检测（Windows/macOS/Linux）
+│   └── formatters.ts           # 时间、字节及路径解码格式化
 ├── scanners/
-│   ├── base-scanner.ts         # Abstract scanner with shared I/O utilities
-│   ├── claude-code-scanner.ts  # Claude Code session discovery and deletion
-│   ├── codex-scanner.ts        # Codex (OpenAI) session discovery and deletion
-│   ├── copilot-scanner.ts      # GitHub Copilot session discovery and deletion
-│   ├── reasonix-scanner.ts     # Reasonix session discovery and deletion
-│   ├── opencode-scanner.ts     # OpenCode session discovery and deletion
-│   ├── gemini-scanner.ts       # Gemini CLI session discovery and deletion
-│   └── registry.ts             # Scanner registry — orchestrates all agent scanners
+│   ├── base-scanner.ts         # 提供共享 I/O 工具的抽象扫描器
+│   ├── claude-code-scanner.ts  # Claude Code 会话发现与删除
+│   ├── codex-scanner.ts        # Codex (OpenAI) 会话发现与删除
+│   ├── copilot-scanner.ts      # GitHub Copilot 会话发现与删除
+│   ├── reasonix-scanner.ts     # Reasonix 会话发现与删除
+│   ├── opencode-scanner.ts     # OpenCode 会话发现与删除
+│   ├── gemini-scanner.ts       # Gemini CLI 会话发现与删除
+│   └── registry.ts             # 调度所有代理扫描器的注册表
 ├── skills/
-│   ├── skill-registry.ts       # Skill discovery, registration, deregistration, inspect, diff
-│   └── display.ts              # Skill overview table, inspect, diff, JSON output
+│   ├── skill-registry.ts       # 技能发现、注册、注销、详情及比较
+│   └── display.ts              # 技能概览、详情、比较及 JSON 输出
 ├── search/
-│   ├── search.ts               # Full-text search across agent session content
-│   └── display.ts              # Search result display with term highlighting
+│   ├── search.ts               # 跨代理会话内容全文搜索
+│   └── display.ts              # 带关键词高亮的搜索结果展示
 ├── doctor/
-│   ├── doctor.ts               # Health check: path existence, permissions, orphan detection
-│   └── display.ts              # Health check result display
+│   ├── doctor.ts               # 路径、权限及孤立数据等健康检查
+│   └── display.ts              # 健康检查结果展示
 ├── ui/
-│   ├── display.ts              # Terminal output: tables, colors, stats formatting
-│   ├── inspect.ts              # Session detail inspection display
-│   └── interactive.ts          # Interactive deletion UI: checkboxes, confirmations
+│   ├── display.ts              # 终端表格、颜色和统计格式化
+│   ├── inspect.ts              # 会话详情展示
+│   └── interactive.ts          # 复选框及确认等交互式删除界面
 └── web/
-    ├── server.ts               # HTTP server, API routes, browser launch
-    ├── html.ts                 # Dashboard HTML/CSS/JS (inline template string)
-    └── quota.ts                # Account detection and quota fetching (Claude Code, Codex)
+    ├── server.ts               # HTTP 服务器、API 路由及浏览器启动
+    ├── html.ts                 # 仪表盘 HTML/CSS/JS（内联模板字符串）
+    └── quota.ts                # 账户检测及配额获取（Claude Code、Codex）
 ```
 
-### Architecture
+### 架构
 
-**Sessions** — Each agent has a **scanner** implementing the `IScanner` interface:
+**会话**——每个代理都有一个实现 `IScanner` 接口的**扫描器**：
 
 ```typescript
 interface IScanner {
@@ -351,15 +356,15 @@ interface IScanner {
 }
 ```
 
-The **ScannerRegistry** aggregates all scanners. CLI commands call the registry, which delegates to the appropriate scanner(s).
+`ScannerRegistry` 聚合所有扫描器。CLI 命令调用注册表，再由注册表将操作委托给对应的一个或多个扫描器。
 
-**Skills** — The **SkillRegistry** scans each agent's skill directory, groups skills by name across agents, and provides register/deregister operations via directory copy/delete. Built-in skill detection is agent-specific (e.g., Codex uses a `.system/` subdirectory marker).
+**技能**——`SkillRegistry` 扫描各代理的技能目录，按名称对跨代理技能进行分组，并通过目录复制/删除实现注册与注销。内置技能的识别方式因代理而异（例如 Codex 使用 `.system/` 子目录标记）。
 
-### Development
+### 开发
 
 ```bash
-npm run dev     # run with tsx (no compile step needed)
-npm run build   # compile TypeScript to dist/
-npm run check   # type-check only (no emit)
-npm test        # run Node test suite through tsx
+npm run dev     # 使用 tsx 运行，无需预先编译
+npm run build   # 将 TypeScript 编译到 dist/
+npm run check   # 仅做类型检查，不生成文件
+npm test        # 通过 tsx 运行 Node 测试套件
 ```
